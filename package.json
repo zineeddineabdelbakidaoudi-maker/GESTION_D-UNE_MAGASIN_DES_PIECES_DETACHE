@@ -1,0 +1,17 @@
+{
+  "name": "gestion-veloo-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:desktop": "pnpm --filter @gestion-veloo/desktop dev",
+    "dev:server": "pnpm --filter @gestion-veloo/server dev",
+    "dev:web": "pnpm --filter @gestion-veloo/web dev",
+    "build": "pnpm -r --filter=!@gestion-veloo/desktop build",
+    "build:all": "pnpm -r build",
+    "build:desktop": "pnpm --filter @gestion-veloo/desktop build",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
