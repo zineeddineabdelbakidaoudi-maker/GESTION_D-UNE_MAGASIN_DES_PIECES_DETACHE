@@ -38,6 +38,14 @@ pub fn run() {
             commands::save_settings,
             commands::print_receipt,
             commands::get_printers,
+            commands::update_product,
+            commands::get_expense_categories,
+            commands::get_depenses,
+            commands::create_depense,
+            commands::delete_depense,
+            commands::get_depenses_total,
+            commands::get_shortcuts,
+            commands::save_shortcuts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

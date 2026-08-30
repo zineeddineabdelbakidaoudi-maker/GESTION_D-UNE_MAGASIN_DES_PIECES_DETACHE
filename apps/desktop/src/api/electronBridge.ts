@@ -16,6 +16,7 @@ const CHANNEL_TO_TAURI_COMMAND: Record<string, string> = {
   'get-metadata': 'get_metadata',
   'get-products': 'get_products',
   'create-product': 'create_product',
+  'update-product': 'update_product',
   'get-stock': 'get_stock',
   'adjust-stock': 'adjust_stock',
   'transfer-stock': 'transfer_stock',
@@ -36,7 +37,15 @@ const CHANNEL_TO_TAURI_COMMAND: Record<string, string> = {
   'get-reports': 'get_reports',
   'get-settings': 'get_settings',
   'save-settings': 'save_settings',
-  'print-receipt': 'print_receipt'
+  'print-receipt': 'print_receipt',
+  'get-printers': 'get_printers',
+  'get-expense-categories': 'get_expense_categories',
+  'get-depenses': 'get_depenses',
+  'create-depense': 'create_depense',
+  'delete-depense': 'delete_depense',
+  'get-depenses-total': 'get_depenses_total',
+  'get-shortcuts': 'get_shortcuts',
+  'save-shortcuts': 'save_shortcuts'
 };
 
 export async function invokeIpc<T>(channel: string, data?: any): Promise<T> {
@@ -79,6 +88,31 @@ export async function invokeIpc<T>(channel: string, data?: any): Promise<T> {
           storeId: data?.storeId,
           sort: data?.sort
         });
+      }
+      if (channel === 'get-depenses') {
+        return await invoke<T>(tauriCmd, {
+          storeId: data?.storeId,
+          categoryId: data?.categoryId,
+          dateFrom: data?.dateFrom,
+          dateTo: data?.dateTo
+        });
+      }
+      if (channel === 'get-depenses-total') {
+        return await invoke<T>(tauriCmd, {
+          storeId: data?.storeId,
+          dateFrom: data?.dateFrom,
+          dateTo: data?.dateTo
+        });
+      }
+      if (channel === 'delete-depense') {
+        const id = typeof data === 'number' ? data : data?.id;
+        return await invoke<T>(tauriCmd, { id });
+      }
+      if (channel === 'save-shortcuts') {
+        return await invoke<T>(tauriCmd, { shortcuts: data });
+      }
+      if (channel === 'get-expense-categories' || channel === 'get-shortcuts' || channel === 'get-printers' || channel === 'get-metadata' || channel === 'get-trial-status') {
+        return await invoke<T>(tauriCmd);
       }
 
       return await invoke<T>(tauriCmd, { payload: data });

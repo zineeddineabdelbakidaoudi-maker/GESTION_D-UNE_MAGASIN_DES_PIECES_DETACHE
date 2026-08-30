@@ -115,7 +115,7 @@ pub fn get_products(
     let mut sql = "
         SELECT DISTINCT p.id, p.code, p.name, p.category_id, p.brand_id,
                p.price_achat, p.price_detail, p.price_semi_gros, p.price_gros, p.color_mode,
-               c.name as category_name, b.name as brand_name
+               c.name as category_name, b.name as brand_name, COALESCE(p.location, '') as location
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN brands b ON p.brand_id = b.id
@@ -165,6 +165,7 @@ pub fn get_products(
             let color_mode: String = r.get(9)?;
             let category_name: Option<String> = r.get(10)?;
             let brand_name: Option<String> = r.get(11)?;
+            let location: String = r.get(12).unwrap_or_default();
 
             Ok((
                 id,
@@ -179,6 +180,7 @@ pub fn get_products(
                 color_mode,
                 category_name,
                 brand_name,
+                location,
             ))
         })
         .map_err(|e| e.to_string())?;
@@ -198,6 +200,7 @@ pub fn get_products(
             color_mode,
             category_name,
             brand_name,
+            location,
         ) = prod;
 
         // Barcodes
@@ -285,6 +288,7 @@ pub fn get_products(
             "priceSemiGros": price_semi_gros,
             "priceGros": price_gros,
             "colorMode": color_mode,
+            "location": location,
             "categoryName": category_name,
             "brandName": brand_name,
             "barcodes": barcodes,
@@ -319,11 +323,12 @@ pub fn create_product(state: State<DbState>, payload: Value) -> Result<Value, St
     let price_semi_gros = payload["priceSemiGros"].as_i64().unwrap_or(0);
     let price_gros = payload["priceGros"].as_i64().unwrap_or(0);
     let color_mode = payload["colorMode"].as_str().unwrap_or("single");
+    let location = payload["location"].as_str().unwrap_or("");
 
     conn.execute(
-        "INSERT INTO products (id, code, name, category_id, brand_id, price_achat, price_detail, price_semi_gros, price_gros, color_mode)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-        params![max_id, code, name, category_id, brand_id, price_achat, price_detail, price_semi_gros, price_gros, color_mode]
+        "INSERT INTO products (id, code, name, category_id, brand_id, price_achat, price_detail, price_semi_gros, price_gros, color_mode, location)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        params![max_id, code, name, category_id, brand_id, price_achat, price_detail, price_semi_gros, price_gros, color_mode, location]
     ).map_err(|e| e.to_string())?;
 
     // Barcodes (up to 5)
@@ -377,6 +382,118 @@ pub fn create_product(state: State<DbState>, payload: Value) -> Result<Value, St
     }
 
     Ok(serde_json::json!({ "id": max_id, "code": code }))
+}
+
+// 4b. Update Product Command
+#[tauri::command]
+pub fn update_product(state: State<DbState>, payload: Value) -> Result<Value, String> {
+    let conn = state.conn.lock().unwrap();
+
+    let id = payload["id"].as_i64().ok_or("id required")?;
+    let name = payload["name"].as_str().unwrap_or("Produit");
+    let category_id = payload["categoryId"].as_i64();
+    let brand_id = payload["brandId"].as_i64();
+    let price_achat = payload["priceAchat"].as_i64().unwrap_or(0);
+    let price_detail = payload["priceDetail"].as_i64().unwrap_or(0);
+    let price_semi_gros = payload["priceSemiGros"].as_i64().unwrap_or(0);
+    let price_gros = payload["priceGros"].as_i64().unwrap_or(0);
+    let color_mode = payload["colorMode"].as_str().unwrap_or("single");
+    let location = payload["location"].as_str().unwrap_or("");
+
+    // Read avg_price_mode from settings
+    let avg_price_mode: i64 = conn
+        .query_row(
+            "SELECT COALESCE(avg_price_mode, 1) FROM settings WHERE store_id = 1",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(1);
+
+    let existing_price: i64 = conn
+        .query_row(
+            "SELECT price_achat FROM products WHERE id = ?1",
+            params![id],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    let final_price_achat = if avg_price_mode == 1 && existing_price > 0 && price_achat != existing_price {
+        (existing_price + price_achat) / 2
+    } else {
+        price_achat
+    };
+
+    conn.execute(
+        "UPDATE products SET name=?1, category_id=?2, brand_id=?3, price_achat=?4, price_detail=?5, price_semi_gros=?6, price_gros=?7, color_mode=?8, location=?9, updated_at=CURRENT_TIMESTAMP
+         WHERE id=?10",
+        params![name, category_id, brand_id, final_price_achat, price_detail, price_semi_gros, price_gros, color_mode, location, id],
+    ).map_err(|e| e.to_string())?;
+
+    // Update colors
+    let _ = conn.execute("DELETE FROM product_colors WHERE product_id = ?1", params![id]);
+    if color_mode == "single" {
+        if let Some(cids) = payload["colorIds"].as_array() {
+            if let Some(first_cid) = cids.first().and_then(|v| v.as_i64()) {
+                let _ = conn.execute(
+                    "INSERT INTO product_colors (product_id, color_id, merge_group_id) VALUES (?1, ?2, NULL)",
+                    params![id, first_cid],
+                );
+            }
+        }
+    } else if color_mode == "variants" {
+        if let Some(cids) = payload["colorIds"].as_array() {
+            for cid_val in cids {
+                if let Some(cid) = cid_val.as_i64() {
+                    let _ = conn.execute(
+                        "INSERT INTO product_colors (product_id, color_id, merge_group_id) VALUES (?1, ?2, NULL)",
+                        params![id, cid],
+                    );
+                }
+            }
+        }
+    } else if color_mode == "merged" {
+        if let Some(mcids) = payload["mergeColorIds"].as_array() {
+            let merge_group_id = format!("merge-{}-1", id);
+            for cid_val in mcids {
+                if let Some(cid) = cid_val.as_i64() {
+                    let _ = conn.execute(
+                        "INSERT INTO product_colors (product_id, color_id, merge_group_id) VALUES (?1, ?2, ?3)",
+                        params![id, cid, merge_group_id],
+                    );
+                }
+            }
+        }
+    }
+
+    // Update motorcycle compat
+    let _ = conn.execute("DELETE FROM product_motorcycle_compat WHERE product_id = ?1", params![id]);
+    if let Some(motos) = payload["compatibleModelIds"].as_array() {
+        for mid_val in motos {
+            if let Some(mid) = mid_val.as_i64() {
+                let _ = conn.execute(
+                    "INSERT INTO product_motorcycle_compat (product_id, motorcycle_model_id) VALUES (?1, ?2)",
+                    params![id, mid],
+                );
+            }
+        }
+    }
+
+    // Update barcodes
+    if let Some(bcs) = payload["barcodes"].as_array() {
+        if !bcs.is_empty() {
+            let _ = conn.execute("DELETE FROM product_barcodes WHERE product_id = ?1", params![id]);
+            for bc_val in bcs.iter().take(5) {
+                if let Some(bc) = bc_val.as_str() {
+                    let _ = conn.execute(
+                        "INSERT INTO product_barcodes (product_id, barcode_value, source) VALUES (?1, ?2, 'manual')",
+                        params![id, bc],
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(serde_json::json!({ "success": true, "id": id, "finalPriceAchat": final_price_achat }))
 }
 
 // 5. Stock Overview Command
@@ -1437,7 +1554,17 @@ pub fn get_reports(
 
     let total_ca: i64 = totals.iter().sum();
     let sales_count = totals.len() as i64;
-    let total_benefices = (total_ca as f64 * 0.35) as i64;
+    let total_benefices_brut = (total_ca as f64 * 0.35) as i64;
+
+    let mut dep_sql = format!(
+        "SELECT COALESCE(SUM(amount), 0) FROM depenses WHERE {}",
+        date_filter.replace("created_at", "depense_date")
+    );
+    if let Some(sid) = store_id {
+        dep_sql.push_str(&format!(" AND store_id = {}", sid));
+    }
+    let total_depenses: i64 = conn.query_row(&dep_sql, [], |r| r.get(0)).unwrap_or(0);
+    let total_benefices = (total_benefices_brut - total_depenses).max(0);
 
     let debt: i64 = conn
         .query_row(
@@ -1476,6 +1603,8 @@ pub fn get_reports(
 
     Ok(serde_json::json!({
         "totalCA": total_ca,
+        "totalBeneficesBrut": total_benefices_brut,
+        "totalDepenses": total_depenses,
         "totalBenefices": total_benefices,
         "salesCount": sales_count,
         "totalDetteClients": debt.max(0),
@@ -1490,11 +1619,12 @@ pub fn get_settings(state: State<DbState>, store_id: i64) -> Result<Value, Strin
     let conn = state.conn.lock().unwrap();
 
     let mut stmt = conn.prepare(
-        "SELECT store_id, store_name, address, phone, logo_url, printer_type, printer_target, receipt_footer, tax_rate, nif, nis, rc, article_imposition
+        "SELECT store_id, store_name, address, phone, logo_url, printer_type, printer_target, receipt_footer, tax_rate, nif, nis, rc, article_imposition, avg_price_mode
          FROM settings WHERE store_id = ?1"
     ).map_err(|e| e.to_string())?;
 
     let row = stmt.query_row(params![store_id], |r| {
+        let avg_mode: Option<i64> = r.get(13).ok();
         Ok(serde_json::json!({
             "storeId": r.get::<_, i64>(0)?,
             "storeName": r.get::<_, String>(1)?,
@@ -1508,7 +1638,8 @@ pub fn get_settings(state: State<DbState>, store_id: i64) -> Result<Value, Strin
             "nif": r.get::<_, Option<String>>(9)?,
             "nis": r.get::<_, Option<String>>(10)?,
             "rc": r.get::<_, Option<String>>(11)?,
-            "articleImposition": r.get::<_, Option<String>>(12)?
+            "articleImposition": r.get::<_, Option<String>>(12)?,
+            "avgPriceMode": avg_mode.map(|v| v != 0).unwrap_or(true)
         }))
     });
 
@@ -1533,10 +1664,11 @@ pub fn save_settings(state: State<DbState>, payload: Value) -> Result<Value, Str
     let nis = payload["nis"].as_str().unwrap_or("");
     let rc = payload["rc"].as_str().unwrap_or("");
     let article_imposition = payload["articleImposition"].as_str().unwrap_or("");
+    let avg_price_mode = if payload["avgPriceMode"].as_bool().unwrap_or(true) { 1 } else { 0 };
 
     conn.execute(
-        "INSERT INTO settings (store_id, store_name, address, phone, printer_type, printer_target, receipt_footer, nif, nis, rc, article_imposition)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+        "INSERT INTO settings (store_id, store_name, address, phone, printer_type, printer_target, receipt_footer, nif, nis, rc, article_imposition, avg_price_mode)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
          ON CONFLICT(store_id) DO UPDATE SET
             store_name = excluded.store_name,
             address = excluded.address,
@@ -1547,9 +1679,184 @@ pub fn save_settings(state: State<DbState>, payload: Value) -> Result<Value, Str
             nif = excluded.nif,
             nis = excluded.nis,
             rc = excluded.rc,
-            article_imposition = excluded.article_imposition",
-        params![store_id, store_name, address, phone, printer_type, printer_target, receipt_footer, nif, nis, rc, article_imposition]
+            article_imposition = excluded.article_imposition,
+            avg_price_mode = excluded.avg_price_mode",
+        params![store_id, store_name, address, phone, printer_type, printer_target, receipt_footer, nif, nis, rc, article_imposition, avg_price_mode]
     ).map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({ "success": true }))
+}
+
+// 19. Dépenses Commands
+#[tauri::command]
+pub fn get_expense_categories(state: State<DbState>) -> Result<Vec<Value>, String> {
+    let conn = state.conn.lock().unwrap();
+    let mut stmt = conn
+        .prepare("SELECT id, name FROM expense_categories ORDER BY id ASC")
+        .map_err(|e| e.to_string())?;
+
+    let cats = stmt
+        .query_map([], |r| {
+            Ok(serde_json::json!({
+                "id": r.get::<_, i64>(0)?,
+                "name": r.get::<_, String>(1)?
+            }))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(cats)
+}
+
+#[tauri::command]
+pub fn get_depenses(
+    state: State<DbState>,
+    store_id: Option<i64>,
+    category_id: Option<i64>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+) -> Result<Vec<Value>, String> {
+    let conn = state.conn.lock().unwrap();
+
+    let mut sql = "
+        SELECT d.id, d.store_id, d.category_id, d.amount, d.note, d.user_id, d.depense_date, d.created_at,
+               ec.name as category_name, u.full_name as user_name, st.name as store_name
+        FROM depenses d
+        JOIN expense_categories ec ON d.category_id = ec.id
+        JOIN users u ON d.user_id = u.id
+        JOIN stores st ON d.store_id = st.id
+        WHERE 1=1
+    ".to_string();
+
+    if let Some(sid) = store_id {
+        sql.push_str(&format!(" AND d.store_id = {}", sid));
+    }
+    if let Some(cid) = category_id {
+        sql.push_str(&format!(" AND d.category_id = {}", cid));
+    }
+    if let Some(df) = date_from {
+        sql.push_str(&format!(" AND date(d.depense_date) >= date('{}')", df.replace('\'', "''")));
+    }
+    if let Some(dt) = date_to {
+        sql.push_str(&format!(" AND date(d.depense_date) <= date('{}')", dt.replace('\'', "''")));
+    }
+    sql.push_str(" ORDER BY d.id DESC");
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let depenses = stmt
+        .query_map([], |r| {
+            Ok(serde_json::json!({
+                "id": r.get::<_, i64>(0)?,
+                "storeId": r.get::<_, i64>(1)?,
+                "categoryId": r.get::<_, i64>(2)?,
+                "amount": r.get::<_, i64>(3)?,
+                "note": r.get::<_, String>(4)?,
+                "userId": r.get::<_, i64>(5)?,
+                "depenseDate": r.get::<_, String>(6)?,
+                "createdAt": r.get::<_, String>(7)?,
+                "categoryName": r.get::<_, String>(8)?,
+                "userName": r.get::<_, String>(9)?,
+                "storeName": r.get::<_, String>(10)?
+            }))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(depenses)
+}
+
+#[tauri::command]
+pub fn create_depense(state: State<DbState>, payload: Value) -> Result<Value, String> {
+    let conn = state.conn.lock().unwrap();
+
+    let store_id = payload["storeId"].as_i64().unwrap_or(1);
+    let category_id = payload["categoryId"].as_i64().ok_or("categoryId required")?;
+    let amount = payload["amount"].as_i64().unwrap_or(0);
+    let note = payload["note"].as_str().unwrap_or("");
+    let user_id = payload["userId"].as_i64().unwrap_or(1);
+    let depense_date = payload["depenseDate"].as_str().unwrap_or("");
+
+    conn.execute(
+        "INSERT INTO depenses (store_id, category_id, amount, note, user_id, depense_date)
+         VALUES (?1, ?2, ?3, ?4, ?5, CASE WHEN ?6 != '' THEN ?6 ELSE CURRENT_TIMESTAMP END)",
+        params![store_id, category_id, amount, note, user_id, depense_date],
+    ).map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({ "id": conn.last_insert_rowid(), "success": true }))
+}
+
+#[tauri::command]
+pub fn delete_depense(state: State<DbState>, id: i64) -> Result<Value, String> {
+    let conn = state.conn.lock().unwrap();
+    conn.execute("DELETE FROM depenses WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+    Ok(serde_json::json!({ "success": true }))
+}
+
+#[tauri::command]
+pub fn get_depenses_total(
+    state: State<DbState>,
+    store_id: Option<i64>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+) -> Result<i64, String> {
+    let conn = state.conn.lock().unwrap();
+
+    let mut sql = "SELECT COALESCE(SUM(amount), 0) FROM depenses WHERE 1=1".to_string();
+    if let Some(sid) = store_id {
+        sql.push_str(&format!(" AND store_id = {}", sid));
+    }
+    if let Some(df) = date_from {
+        sql.push_str(&format!(" AND date(depense_date) >= date('{}')", df.replace('\'', "''")));
+    }
+    if let Some(dt) = date_to {
+        sql.push_str(&format!(" AND date(depense_date) <= date('{}')", dt.replace('\'', "''")));
+    }
+
+    let total: i64 = conn.query_row(&sql, [], |r| r.get(0)).unwrap_or(0);
+    Ok(total)
+}
+
+// 20. Keyboard Shortcuts Commands
+#[tauri::command]
+pub fn get_shortcuts(state: State<DbState>) -> Result<Value, String> {
+    let conn = state.conn.lock().unwrap();
+    let mut stmt = conn
+        .prepare("SELECT action, shortcut FROM keyboard_shortcuts")
+        .map_err(|e| e.to_string())?;
+
+    let mut map = serde_json::Map::new();
+    let rows = stmt
+        .query_map([], |r| {
+            let act: String = r.get(0)?;
+            let sc: String = r.get(1)?;
+            Ok((act, sc))
+        })
+        .map_err(|e| e.to_string())?;
+
+    for (k, v) in rows.flatten() {
+        map.insert(k, Value::String(v));
+    }
+
+    Ok(Value::Object(map))
+}
+
+#[tauri::command]
+pub fn save_shortcuts(state: State<DbState>, shortcuts: Value) -> Result<Value, String> {
+    let conn = state.conn.lock().unwrap();
+
+    if let Some(obj) = shortcuts.as_object() {
+        for (action, sc_val) in obj {
+            if let Some(sc) = sc_val.as_str() {
+                let _ = conn.execute(
+                    "INSERT INTO keyboard_shortcuts (action, shortcut) VALUES (?1, ?2)
+                     ON CONFLICT(action) DO UPDATE SET shortcut = excluded.shortcut",
+                    params![action, sc],
+                );
+            }
+        }
+    }
 
     Ok(serde_json::json!({ "success": true }))
 }
