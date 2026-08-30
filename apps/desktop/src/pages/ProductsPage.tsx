@@ -38,8 +38,9 @@ export const ProductsPage: React.FC = () => {
   const [motorcycles, setMotorcycles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Add Product Modal State
+  // Add/Edit Product Modal State
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [name, setName] = useState('');
   const [categoryId, setCategoryId] = useState<number | ''>('');
   const [brandId, setBrandId] = useState<number | ''>('');
@@ -47,6 +48,7 @@ export const ProductsPage: React.FC = () => {
   const [priceDetail, setPriceDetail] = useState<string>('');
   const [priceSemiGros, setPriceSemiGros] = useState<string>('');
   const [priceGros, setPriceGros] = useState<string>('');
+  const [location, setLocation] = useState<string>('');
   const [colorMode, setColorMode] = useState<ColorMode>('single');
   const [selectedColorId, setSelectedColorId] = useState<number | ''>('');
   const [variantColorIds, setVariantColorIds] = useState<number[]>([]);
@@ -148,6 +150,7 @@ export const ProductsPage: React.FC = () => {
         priceDetail: pDetail,
         priceSemiGros: pSemi || pDetail,
         priceGros: pGros || pDetail,
+        location,
         colorMode,
         colorIds: colorMode === 'single' ? (selectedColorId ? [Number(selectedColorId)] : []) : variantColorIds,
         mergeColorIds: colorMode === 'merged' ? mergeColorIds : [],
@@ -160,8 +163,13 @@ export const ProductsPage: React.FC = () => {
         }
       };
 
-      await invokeIpc('create-product', payload);
-      alert(isAr ? 'تمت إضافة المنتج بنجاح!' : 'Produit créé avec succès !');
+      if (editingProduct) {
+        await invokeIpc('update-product', { ...payload, id: editingProduct.id });
+        alert(isAr ? 'تم تعديل المنتج بنجاح!' : 'Produit modifié avec succès !');
+      } else {
+        await invokeIpc('create-product', payload);
+        alert(isAr ? 'تمت إضافة المنتج بنجاح!' : 'Produit créé avec succès !');
+      }
       setShowAddModal(false);
       resetForm();
       loadData();
@@ -171,6 +179,7 @@ export const ProductsPage: React.FC = () => {
   };
 
   const resetForm = () => {
+    setEditingProduct(null);
     setName('');
     setCategoryId('');
     setBrandId('');
@@ -178,6 +187,7 @@ export const ProductsPage: React.FC = () => {
     setPriceDetail('');
     setPriceSemiGros('');
     setPriceGros('');
+    setLocation('');
     setColorMode('single');
     setSelectedColorId('');
     setVariantColorIds([]);
@@ -188,6 +198,29 @@ export const ProductsPage: React.FC = () => {
     setMotoSearchFilter('');
     setInitialStockStore1('0');
     setInitialStockStore2('0');
+  };
+
+  const openEditModal = (p: Product) => {
+    setEditingProduct(p);
+    setName(p.name);
+    setCategoryId(p.categoryId || '');
+    setBrandId(p.brandId || '');
+    setPriceAchat(String((p.priceAchat || 0) / 100));
+    setPriceDetail(String((p.priceDetail || 0) / 100));
+    setPriceSemiGros(String((p.priceSemiGros || 0) / 100));
+    setPriceGros(String((p.priceGros || 0) / 100));
+    setLocation(p.location || '');
+    setColorMode(p.colorMode);
+    const colorIds = (p.colors || []).map((c: any) => c.colorId);
+    if (p.colorMode === 'single') setSelectedColorId(colorIds[0] || '');
+    else if (p.colorMode === 'variants') setVariantColorIds(colorIds);
+    else if (p.colorMode === 'merged') setMergeColorIds(colorIds);
+    setBarcodesList((p.barcodes || []).map((b: any) => b.barcodeValue));
+    setCompatibleMotos(((p as any).compatibleModels || []).map((m: any) => m.id));
+    setMotoSearchFilter('');
+    setInitialStockStore1('0');
+    setInitialStockStore2('0');
+    setShowAddModal(true);
   };
 
   const generateProformaPDF = () => {
@@ -302,6 +335,7 @@ export const ProductsPage: React.FC = () => {
               <tr>
                 <th className="px-4 py-3">{isAr ? 'الرمز' : 'Code Article'}</th>
                 <th className="px-4 py-3">{isAr ? 'تعيين القطعة والموتوات' : 'Désignation & Compatibilité Motos'}</th>
+                <th className="px-4 py-3">{isAr ? 'الموقع في المخزن' : 'Emplacement'}</th>
                 <th className="px-4 py-3">{isAr ? 'الصنف والماركة' : 'Catégorie & Marque'}</th>
                 <th className="px-4 py-3">{isAr ? 'اللون' : 'Gestion Couleur'}</th>
                 <th className="px-4 py-3 text-right">{isAr ? 'سعر الشراء' : 'Prix Achat'}</th>
@@ -309,11 +343,13 @@ export const ProductsPage: React.FC = () => {
                 <th className="px-4 py-3 text-right">{isAr ? 'نصف الجملة' : 'Semi-Gros'}</th>
                 <th className="px-4 py-3 text-right">{isAr ? 'الجملة' : 'Gros'}</th>
                 <th className="px-4 py-3 text-center">{isAr ? 'المخزون' : 'Stock Dispo'}</th>
+                {hasPermission('produits', 'edit') && <th className="px-4 py-3 text-center">{isAr ? 'تعديل' : 'Modifier'}</th>}
               </tr>
             </thead>
             <tbody className={`divide-y ${isDark ? 'divide-slate-800' : 'divide-slate-200'}`}>
               {products.map(p => {
                 const stockQty = p.stock?.find(s => s.storeId === currentStore?.id)?.quantity || 0;
+                const productLocation = (p as any).location || '';
                 return (
                   <tr key={p.id} className={isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}>
                     <td className="px-4 py-3 font-mono font-bold text-blue-400">{p.code}</td>
@@ -336,6 +372,17 @@ export const ProductsPage: React.FC = () => {
                         <div className="text-[10px] text-slate-400 font-mono mt-0.5">
                           {p.barcodes.map(b => b.barcodeValue).join(' | ')}
                         </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {productLocation ? (
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg font-mono font-black text-[11px] border ${
+                          isDark ? 'bg-amber-950/50 text-amber-300 border-amber-800/50' : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}>
+                          {productLocation}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-slate-400">
@@ -361,6 +408,19 @@ export const ProductsPage: React.FC = () => {
                         {stockQty}
                       </span>
                     </td>
+                    {hasPermission('produits', 'edit') && (
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => openEditModal(p)}
+                          title={isAr ? 'تعديل المنتج' : 'Modifier le produit'}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            isDark ? 'text-slate-400 hover:text-blue-400 hover:bg-blue-500/10' : 'text-slate-500 hover:text-blue-600 hover:bg-blue-50'
+                          }`}
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -382,7 +442,10 @@ export const ProductsPage: React.FC = () => {
                 isDark ? 'text-white' : 'text-slate-900'
               }`}>
                 <PackagePlus className="w-5 h-5 text-blue-500" />
-                <span>{isAr ? 'إضافة منتج / قطعة جديدة' : 'Nouveau Produit / Article'}</span>
+                <span>{editingProduct 
+                  ? (isAr ? `تعديل: ${editingProduct.code}` : `Modifier — ${editingProduct.code}`)
+                  : (isAr ? 'إضافة منتج / قطعة جديدة' : 'Nouveau Produit / Article')
+                }</span>
               </h3>
               <button 
                 onClick={() => setShowAddModal(false)}
@@ -448,6 +511,21 @@ export const ProductsPage: React.FC = () => {
                       <option value="">{isAr ? '-- اختر الماركة --' : '-- Choisir --'}</option>
                       {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
+                  </div>
+
+                  <div>
+                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      {isAr ? 'الموقع في المخزن (مثال: A-06، L-08)' : 'Emplacement en Magasin (ex: A-06, L-08)'}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="A-06"
+                      value={location}
+                      onChange={e => setLocation(e.target.value.toUpperCase())}
+                      className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none ${
+                        isDark ? 'bg-slate-800 border-slate-700 text-amber-300 placeholder-slate-500' : 'bg-white border-slate-300 text-amber-700 placeholder-slate-400'
+                      }`}
+                    />
                   </div>
 
                   <div>

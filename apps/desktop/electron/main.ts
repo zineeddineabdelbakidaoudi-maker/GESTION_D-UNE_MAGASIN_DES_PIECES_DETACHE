@@ -144,6 +144,7 @@ function registerIpcHandlers() {
         priceSemiGros: p.price_semi_gros,
         priceGros: p.price_gros,
         colorMode: p.color_mode,
+        location: p.location || '',
         barcodes,
         colors,
         compatibleModels,
@@ -160,10 +161,10 @@ function registerIpcHandlers() {
     const code = formatProductCode(nextId);
 
     const insertProd = db.prepare(`
-      INSERT INTO products (id, code, name, category_id, brand_id, price_achat, price_detail, price_semi_gros, price_gros, color_mode)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO products (id, code, name, category_id, brand_id, price_achat, price_detail, price_semi_gros, price_gros, color_mode, location)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    insertProd.run(nextId, code, payload.name, payload.categoryId || null, payload.brandId || null, payload.priceAchat, payload.priceDetail, payload.priceSemiGros, payload.priceGros, payload.colorMode);
+    insertProd.run(nextId, code, payload.name, payload.categoryId || null, payload.brandId || null, payload.priceAchat, payload.priceDetail, payload.priceSemiGros, payload.priceGros, payload.colorMode, payload.location || '');
 
     const barcodes = payload.barcodes && payload.barcodes.length > 0 ? payload.barcodes : [generateBarcodeValue(nextId)];
     const insertBarcode = db.prepare('INSERT INTO product_barcodes (product_id, barcode_value, source) VALUES (?, ?, ?)');
@@ -202,6 +203,57 @@ function registerIpcHandlers() {
     }
 
     return { id: nextId, code };
+  });
+
+  // Update Product (Edit)
+  ipcMain.handle('update-product', (_event, payload: any) => {
+    const { id, name, categoryId, brandId, priceAchat, priceDetail, priceSemiGros, priceGros, colorMode, location, colorIds, mergeColorIds, compatibleModelIds, barcodes } = payload;
+    
+    // Read avg_price_mode from settings
+    const settings = db.prepare('SELECT avg_price_mode FROM settings WHERE store_id = 1').get() as any;
+    const avgPriceMode = settings ? settings.avg_price_mode : 1;
+    
+    // Compute final price_achat
+    let finalPriceAchat = priceAchat;
+    if (avgPriceMode === 1) {
+      const existing = db.prepare('SELECT price_achat FROM products WHERE id = ?').get(id) as any;
+      if (existing && existing.price_achat > 0 && priceAchat !== existing.price_achat) {
+        finalPriceAchat = Math.round((existing.price_achat + priceAchat) / 2);
+      }
+    }
+
+    db.prepare(`
+      UPDATE products SET name=?, category_id=?, brand_id=?, price_achat=?, price_detail=?, price_semi_gros=?, price_gros=?, color_mode=?, location=?, updated_at=CURRENT_TIMESTAMP
+      WHERE id=?
+    `).run(name, categoryId || null, brandId || null, finalPriceAchat, priceDetail, priceSemiGros, priceGros, colorMode, location || '', id);
+
+    // Update colors
+    db.prepare('DELETE FROM product_colors WHERE product_id = ?').run(id);
+    const insertColor = db.prepare('INSERT INTO product_colors (product_id, color_id, merge_group_id) VALUES (?, ?, ?)');
+    if (colorMode === 'single' && colorIds && colorIds.length > 0) {
+      insertColor.run(id, colorIds[0], null);
+    } else if (colorMode === 'variants' && colorIds) {
+      for (const cid of colorIds) insertColor.run(id, cid, null);
+    } else if (colorMode === 'merged' && mergeColorIds) {
+      const mergeGroupId = `merge-${id}-${Date.now()}`;
+      for (const cid of mergeColorIds) insertColor.run(id, cid, mergeGroupId);
+    }
+
+    // Update motorcycle compat
+    db.prepare('DELETE FROM product_motorcycle_compat WHERE product_id = ?').run(id);
+    if (compatibleModelIds && compatibleModelIds.length > 0) {
+      const insertCompat = db.prepare('INSERT INTO product_motorcycle_compat (product_id, motorcycle_model_id) VALUES (?, ?)');
+      for (const mid of compatibleModelIds) insertCompat.run(id, mid);
+    }
+
+    // Update barcodes (keep up to 5)
+    if (barcodes && barcodes.length > 0) {
+      db.prepare('DELETE FROM product_barcodes WHERE product_id = ?').run(id);
+      const insertBarcode = db.prepare('INSERT INTO product_barcodes (product_id, barcode_value, source) VALUES (?, ?, ?)');
+      for (const bc of barcodes.slice(0, 5)) insertBarcode.run(id, bc, 'manual');
+    }
+
+    return { success: true, id, finalPriceAchat };
   });
 
   // 5. Stock Overview & Movement Highlights
@@ -452,6 +504,10 @@ function registerIpcHandlers() {
     const insertItem = db.prepare('INSERT INTO purchase_items (purchase_id, product_id, qty, unit_cost, line_total) VALUES (?, ?, ?, ?, ?)');
     const insertMovement = db.prepare('INSERT INTO stock_movements (product_id, store_id, movement_code, qty_before, qty_after, delta, user_id, ref_type, ref_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
 
+    // Get avg_price_mode setting
+    const purchaseSettings = db.prepare('SELECT avg_price_mode FROM settings WHERE store_id = ?').get(storeId || 1) as any;
+    const avgPriceMode = purchaseSettings ? (purchaseSettings.avg_price_mode || 1) : 1;
+
     for (const it of items) {
       insertItem.run(purchaseId, it.productId, it.qty, it.unitCost, it.qty * it.unitCost);
 
@@ -463,6 +519,17 @@ function registerIpcHandlers() {
         INSERT INTO product_stock (product_id, store_id, quantity) VALUES (?, ?, ?)
         ON CONFLICT(product_id, store_id) DO UPDATE SET quantity = excluded.quantity
       `).run(it.productId, storeId, qtyAfter);
+
+      // Update product price_achat based on avg_price_mode setting
+      const existingProduct = db.prepare('SELECT price_achat FROM products WHERE id = ?').get(it.productId) as any;
+      if (existingProduct) {
+        let newPriceAchat = it.unitCost;
+        if (avgPriceMode === 1 && existingProduct.price_achat > 0 && it.unitCost !== existingProduct.price_achat) {
+          // Average mode: (old_price + new_price) / 2
+          newPriceAchat = Math.round((existingProduct.price_achat + it.unitCost) / 2);
+        }
+        db.prepare('UPDATE products SET price_achat = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newPriceAchat, it.productId);
+      }
 
       // CODE 90 (Achat)
       insertMovement.run(it.productId, storeId, STOCK_MOVEMENT_CODES.ACHAT, qtyBefore, qtyAfter, it.qty, userId || 1, 'purchase', purchaseId);
@@ -523,7 +590,19 @@ function registerIpcHandlers() {
 
     const totalCA = sales.reduce((acc, s) => acc + s.total, 0);
     const salesCount = sales.length;
-    const totalBenefices = Math.max(0, Math.round(totalCA * 0.35));
+    const totalBeneficesBrut = Math.max(0, Math.round(totalCA * 0.35));
+
+    // Calculate total expenses for the period
+    let depFilter = dateFilter.replace(/created_at/g, 'depense_date');
+    let depSql = `SELECT COALESCE(SUM(amount), 0) as totalDep FROM depenses WHERE ${depFilter}`;
+    const depParams: any[] = [];
+    if (storeId) {
+      depSql += ' AND store_id = ?';
+      depParams.push(storeId);
+    }
+    const depRow = db.prepare(depSql).get(...depParams) as any;
+    const totalDepenses = depRow?.totalDep || 0;
+    const totalBenefices = Math.max(0, totalBeneficesBrut - totalDepenses);
 
     const clientsDebt = db.prepare(`
       SELECT COALESCE(SUM(CASE WHEN type = 'achat' THEN amount WHEN type = 'versement' THEN -amount ELSE 0 END), 0) as debt
@@ -550,6 +629,8 @@ function registerIpcHandlers() {
 
     return {
       totalCA,
+      totalBeneficesBrut,
+      totalDepenses,
       totalBenefices,
       salesCount,
       totalDetteClients: clientsDebt?.debt || 0,
@@ -626,8 +707,8 @@ function registerIpcHandlers() {
 
   ipcMain.handle('save-settings', (_event, payload: any) => {
     return db.prepare(`
-      INSERT INTO settings (store_id, store_name, address, phone, printer_type, printer_target, receipt_footer, tax_rate, nif, nis, rc, article_imposition)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO settings (store_id, store_name, address, phone, printer_type, printer_target, receipt_footer, tax_rate, nif, nis, rc, article_imposition, avg_price_mode)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(store_id) DO UPDATE SET
         store_name = excluded.store_name,
         address = excluded.address,
@@ -638,8 +719,9 @@ function registerIpcHandlers() {
         nif = excluded.nif,
         nis = excluded.nis,
         rc = excluded.rc,
-        article_imposition = excluded.article_imposition
-    `).run(payload.storeId, payload.storeName, payload.address, payload.phone, payload.printerType, payload.printerTarget, payload.receiptFooter, payload.taxRate || 0, payload.nif || '', payload.nis || '', payload.rc || '', payload.articleImposition || '');
+        article_imposition = excluded.article_imposition,
+        avg_price_mode = excluded.avg_price_mode
+    `).run(payload.storeId, payload.storeName, payload.address, payload.phone, payload.printerType, payload.printerTarget, payload.receiptFooter, payload.taxRate || 0, payload.nif || '', payload.nis || '', payload.rc || '', payload.articleImposition || '', payload.avgPriceMode !== undefined ? (payload.avgPriceMode ? 1 : 0) : 1);
   });
 
   ipcMain.handle('get-printers', async (event) => {
@@ -682,5 +764,79 @@ ${settings?.receiptFooter || 'Merci pour votre confiance !'}
 ================================================
     `.trim();
     return { success: true, receiptText };
+  });
+
+  // Dépenses (Expenses)
+  ipcMain.handle('get-expense-categories', () => {
+    return db.prepare('SELECT * FROM expense_categories ORDER BY id ASC').all();
+  });
+
+  ipcMain.handle('get-depenses', (_event, params?: { storeId?: number; categoryId?: number; dateFrom?: string; dateTo?: string }) => {
+    const { storeId, categoryId, dateFrom, dateTo } = params || {};
+    let sql = `
+      SELECT d.*, ec.name as categoryName, u.full_name as userName, st.name as storeName
+      FROM depenses d
+      JOIN expense_categories ec ON d.category_id = ec.id
+      JOIN users u ON d.user_id = u.id
+      JOIN stores st ON d.store_id = st.id
+      WHERE 1=1
+    `;
+    const sqlParams: any[] = [];
+    if (storeId) { sql += ' AND d.store_id = ?'; sqlParams.push(storeId); }
+    if (categoryId) { sql += ' AND d.category_id = ?'; sqlParams.push(categoryId); }
+    if (dateFrom) { sql += ' AND date(d.depense_date) >= date(?)'; sqlParams.push(dateFrom); }
+    if (dateTo) { sql += ' AND date(d.depense_date) <= date(?)'; sqlParams.push(dateTo); }
+    sql += ' ORDER BY d.id DESC';
+    return db.prepare(sql).all(...sqlParams);
+  });
+
+  ipcMain.handle('create-depense', (_event, payload: any) => {
+    const { storeId, categoryId, amount, note, userId, depenseDate } = payload;
+    const res = db.prepare(`
+      INSERT INTO depenses (store_id, category_id, amount, note, user_id, depense_date)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(storeId, categoryId, amount, note || '', userId || 1, depenseDate || new Date().toISOString());
+    return { id: res.lastInsertRowid, success: true };
+  });
+
+  ipcMain.handle('delete-depense', (_event, id: number) => {
+    db.prepare('DELETE FROM depenses WHERE id = ?').run(id);
+    return { success: true };
+  });
+
+  ipcMain.handle('get-depenses-total', (_event, params?: { storeId?: number; dateFrom?: string; dateTo?: string }) => {
+    const { storeId, dateFrom, dateTo } = params || {};
+    let sql = `SELECT COALESCE(SUM(amount), 0) as total FROM depenses WHERE 1=1`;
+    const sqlParams: any[] = [];
+    if (storeId) { sql += ' AND store_id = ?'; sqlParams.push(storeId); }
+    if (dateFrom) { sql += ' AND date(depense_date) >= date(?)'; sqlParams.push(dateFrom); }
+    if (dateTo) { sql += ' AND date(depense_date) <= date(?)'; sqlParams.push(dateTo); }
+    const row = db.prepare(sql).get(...sqlParams) as any;
+    return row?.total || 0;
+  });
+
+  // Keyboard Shortcuts
+  ipcMain.handle('get-shortcuts', () => {
+    const rows = db.prepare('SELECT action, shortcut FROM keyboard_shortcuts').all() as any[];
+    const result: Record<string, string> = {};
+    for (const r of rows) result[r.action] = r.shortcut;
+    return result;
+  });
+
+  ipcMain.handle('save-shortcuts', (_event, shortcuts: Record<string, string>) => {
+    const upsert = db.prepare('INSERT INTO keyboard_shortcuts (action, shortcut) VALUES (?, ?) ON CONFLICT(action) DO UPDATE SET shortcut = excluded.shortcut');
+    for (const [action, shortcut] of Object.entries(shortcuts)) {
+      upsert.run(action, shortcut);
+    }
+    return { success: true };
+  });
+
+  ipcMain.handle('add-expense-category', (_event, name: string) => {
+    try {
+      const res = db.prepare('INSERT INTO expense_categories (name) VALUES (?)').run(name);
+      return { id: res.lastInsertRowid, name };
+    } catch {
+      return { error: 'Catégorie déjà existante' };
+    }
   });
 }

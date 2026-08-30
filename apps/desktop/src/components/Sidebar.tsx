@@ -26,6 +26,7 @@ export const Sidebar: React.FC = () => {
     { id: 'clients', label: isAr ? 'الزبائن والديون' : 'Clients & Crédits', icon: Users, module: 'clients' },
     { id: 'fournisseurs', label: isAr ? 'الموردين' : 'Fournisseurs', icon: Building2, module: 'fournisseurs' },
     { id: 'rapport', label: isAr ? 'التقارير المالية' : 'Rapports Financiers', icon: BarChart3, module: 'rapport' },
+    { id: 'depenses', label: isAr ? 'المصاريف والنفقات' : 'Dépenses & Charges', icon: Calculator, module: 'depenses' },
     { id: 'zakat', label: isAr ? 'حساب الزكاة' : 'Calcul Zakat', icon: Calculator, module: 'zakat' },
     { id: 'settings', label: isAr ? 'الإعدادات' : 'Paramètres', icon: Settings, module: 'settings' }
   ];

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { useStore } from './store/useStore';
 import { LoginPage } from './pages/LoginPage';
 import { TrialBanner } from './components/TrialBanner';
@@ -13,9 +13,11 @@ import { SuppliersPage } from './pages/SuppliersPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ZakatPage } from './pages/ZakatPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { DepensesPage } from './pages/DepensesPage';
+import { invokeIpc } from './api/electronBridge';
 
 export const App: React.FC = () => {
-  const { currentUser, activeTab, theme, lang } = useStore();
+  const { currentUser, activeTab, setActiveTab, theme, lang } = useStore();
   const isDark = theme === 'dark';
   const isAr = lang === 'ar';
 
@@ -26,6 +28,43 @@ export const App: React.FC = () => {
       document.documentElement.classList.remove('dark');
     }
   }, [isDark]);
+
+  // Global Keyboard Shortcuts handler
+  const handleGlobalShortcut = useCallback(async (e: KeyboardEvent) => {
+    // Don't trigger shortcuts when typing in an input, textarea, or select
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    try {
+      const shortcuts = await invokeIpc<Record<string, string>>('get-shortcuts');
+      if (!shortcuts) return;
+
+      const pressed = [
+        e.ctrlKey && 'Control',
+        e.shiftKey && 'Shift',
+        e.altKey && 'Alt',
+        e.key !== 'Control' && e.key !== 'Shift' && e.key !== 'Alt' && e.key
+      ].filter(Boolean).join('+');
+
+      const action = Object.entries(shortcuts).find(([_, sc]) => sc === pressed)?.[0];
+      if (!action) return;
+
+      const navMap: Record<string, string> = {
+        goto_pos: 'pos', goto_produits: 'produits', goto_stock: 'stock',
+        goto_achat: 'achat', goto_clients: 'clients', goto_fournisseurs: 'fournisseurs',
+        goto_rapport: 'rapport', goto_depenses: 'depenses', goto_settings: 'settings'
+      };
+      if (navMap[action]) {
+        e.preventDefault();
+        setActiveTab(navMap[action]);
+      }
+    } catch {}
+  }, [setActiveTab]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleGlobalShortcut);
+    return () => window.removeEventListener('keydown', handleGlobalShortcut);
+  }, [handleGlobalShortcut]);
 
   if (!currentUser) {
     return <LoginPage />;
@@ -61,6 +100,7 @@ export const App: React.FC = () => {
             {activeTab === 'clients' && <ClientsPage />}
             {activeTab === 'fournisseurs' && <SuppliersPage />}
             {activeTab === 'rapport' && <ReportsPage />}
+            {activeTab === 'depenses' && <DepensesPage />}
             {activeTab === 'zakat' && <ZakatPage />}
             {activeTab === 'settings' && <SettingsPage />}
           </main>

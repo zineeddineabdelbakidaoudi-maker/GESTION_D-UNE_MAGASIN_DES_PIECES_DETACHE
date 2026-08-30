@@ -95,6 +95,7 @@ function initLocalSchema(db: Database.Database) {
       price_semi_gros INTEGER NOT NULL DEFAULT 0,
       price_gros INTEGER NOT NULL DEFAULT 0,
       color_mode TEXT NOT NULL DEFAULT 'single',
+      location TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -280,7 +281,8 @@ function initLocalSchema(db: Database.Database) {
       nif TEXT DEFAULT '',
       nis TEXT DEFAULT '',
       rc TEXT DEFAULT '',
-      article_imposition TEXT DEFAULT ''
+      article_imposition TEXT DEFAULT '',
+      avg_price_mode INTEGER NOT NULL DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS zakat_snapshots (
@@ -316,6 +318,27 @@ function initLocalSchema(db: Database.Database) {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS expense_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE
+    );
+
+    CREATE TABLE IF NOT EXISTS depenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      store_id INTEGER NOT NULL REFERENCES stores(id),
+      category_id INTEGER NOT NULL REFERENCES expense_categories(id),
+      amount INTEGER NOT NULL,
+      note TEXT DEFAULT '',
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      depense_date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS keyboard_shortcuts (
+      action TEXT PRIMARY KEY,
+      shortcut TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_products_code ON products(code);
     CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
     CREATE INDEX IF NOT EXISTS idx_products_cat ON products(category_id);
@@ -332,7 +355,12 @@ function initLocalSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_purchase_items_pur ON purchase_items(purchase_id, product_id);
     CREATE INDEX IF NOT EXISTS idx_client_tx_client ON client_transactions(client_id);
     CREATE INDEX IF NOT EXISTS idx_supp_tx_supp ON supplier_transactions(supplier_id);
+    CREATE INDEX IF NOT EXISTS idx_depenses_store_date ON depenses(store_id, depense_date);
   `);
+
+  // Migrate existing DBs: add new columns if they don't exist
+  try { db.exec(`ALTER TABLE products ADD COLUMN location TEXT NOT NULL DEFAULT ''`); } catch {}
+  try { db.exec(`ALTER TABLE settings ADD COLUMN avg_price_mode INTEGER NOT NULL DEFAULT 1`); } catch {}
 }
 
 function seedLocalData(db: Database.Database) {
@@ -433,4 +461,51 @@ function seedLocalData(db: Database.Database) {
 
   const insertSupplierTx = db.prepare('INSERT INTO supplier_transactions (id, supplier_id, type, amount, note) VALUES (?, ?, ?, ?, ?)');
   insertSupplierTx.run(1, 1, 'achat', 15000000, 'Facture arrivage container #CT-2026-08');
+
+  // Seed expense categories
+  const expCatCount = db.prepare('SELECT COUNT(*) as cnt FROM expense_categories').get() as any;
+  if (!expCatCount || expCatCount.cnt === 0) {
+    const insertExpCat = db.prepare('INSERT INTO expense_categories (id, name) VALUES (?, ?)');
+    const expenseCategories = [
+      [1, 'Paiement de facture / Compte'],
+      [2, 'Électricité'],
+      [3, 'Eau'],
+      [4, 'Loyer'],
+      [5, 'Réparation / Maintenance'],
+      [6, 'Achat pour Hanout (fournitures internes)'],
+      [7, 'Transport'],
+      [8, 'Salaires'],
+      [9, 'Autre']
+    ];
+    for (const [id, name] of expenseCategories) insertExpCat.run(id, name);
+  }
+
+  // Seed default keyboard shortcuts
+  const shortcutCount = db.prepare('SELECT COUNT(*) as cnt FROM keyboard_shortcuts').get() as any;
+  if (!shortcutCount || shortcutCount.cnt === 0) {
+    const insertShortcut = db.prepare('INSERT INTO keyboard_shortcuts (action, shortcut) VALUES (?, ?)');
+    const defaultShortcuts = [
+      ['goto_pos', 'F1'],
+      ['goto_produits', 'F2'],
+      ['goto_stock', 'F3'],
+      ['goto_achat', 'F4'],
+      ['goto_clients', 'F5'],
+      ['goto_fournisseurs', 'F6'],
+      ['goto_rapport', 'F7'],
+      ['goto_depenses', 'F8'],
+      ['goto_settings', 'F9'],
+      ['confirm', 'Enter'],
+      ['cancel', 'Escape'],
+      ['retour', 'Control+R'],
+      ['edit_product', 'Control+E'],
+      ['add_product', 'Control+N'],
+      ['search', 'Control+F'],
+      ['clear_cart', 'Control+D'],
+      ['print_receipt', 'Control+P'],
+      ['toggle_price_tier', 'Control+T'],
+      ['save', 'Control+S'],
+      ['toggle_session', 'Control+Shift+S']
+    ];
+    for (const [action, shortcut] of defaultShortcuts) insertShortcut.run(action, shortcut);
+  }
 }

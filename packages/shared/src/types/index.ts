@@ -89,6 +89,7 @@ export interface Product {
   priceSemiGros: number; // in centimes
   priceGros: number; // in centimes
   colorMode: ColorMode;
+  location?: string;
   createdAt: string;
   updatedAt?: string;
 

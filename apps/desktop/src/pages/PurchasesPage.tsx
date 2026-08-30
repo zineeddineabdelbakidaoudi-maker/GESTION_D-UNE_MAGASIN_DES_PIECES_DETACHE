@@ -27,8 +27,9 @@ interface PurchaseItemInput {
 }
 
 export const PurchasesPage: React.FC = () => {
-  const { currentStore, currentUser, lang } = useStore();
+  const { currentStore, currentUser, lang, theme } = useStore();
   const isAr = lang === 'ar';
+  const isDark = theme === 'dark';
 
   const [activeTab, setActiveTab] = useState<'new' | 'history'>('new');
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -157,12 +158,12 @@ export const PurchasesPage: React.FC = () => {
   });
 
   return (
-    <div className="p-6 space-y-6 h-full overflow-y-auto bg-slate-950 text-slate-100">
+    <div className={`p-6 space-y-6 h-full overflow-y-auto ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       {/* Top Header with Tab Switcher */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-black text-white tracking-tight">
+            <h1 className={`text-xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {isAr ? 'سندات الشراء وإدارة التوريدات' : 'Bons d\'Achat & Réassorts Fournisseurs'}
             </h1>
             <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 text-[11px] font-bold rounded-full border border-emerald-500/30">

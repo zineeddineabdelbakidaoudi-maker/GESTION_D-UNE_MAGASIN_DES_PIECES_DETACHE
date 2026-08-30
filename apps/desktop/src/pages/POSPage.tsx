@@ -68,6 +68,11 @@ export const POSPage: React.FC = () => {
   const [selectedPastSale, setSelectedPastSale] = useState<any | null>(null);
   const [returnItemsState, setReturnItemsState] = useState<Record<number, number>>({});
 
+  // Hover Tooltip (2s delay — shows compatible motos in red card)
+  const [hoveredProduct, setHoveredProduct] = useState<Product | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Barcode HID Keystroke Buffer Listener
   const barcodeBuffer = useRef('');
   const lastKeyTime = useRef(Date.now());
@@ -333,15 +338,26 @@ export const POSPage: React.FC = () => {
         </div>
 
         {/* Product Cards Grid */}
-        <div className="flex-1 p-4 overflow-y-auto grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 content-start">
+        <div className="flex-1 p-4 overflow-y-auto grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 content-start relative">
           {products.map(p => {
             const stockQty = p.stock?.find(s => s.storeId === currentStore?.id)?.quantity || 0;
             const isOutOfStock = stockQty <= 0;
+            const productLocation = (p as any).location || '';
+            const compatModels = (p as any).compatibleModels || [];
 
             return (
               <div
                 key={p.id}
                 onClick={() => !isOutOfStock && addToCart(p, 'detail')}
+                onMouseEnter={(e) => {
+                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  setTooltipPos({ x: rect.left, y: rect.top });
+                  hoverTimerRef.current = setTimeout(() => setHoveredProduct(p), 2000);
+                }}
+                onMouseLeave={() => {
+                  if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+                  setHoveredProduct(null);
+                }}
                 className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between select-none ${
                   isOutOfStock
                     ? 'bg-slate-900/40 border-slate-800 opacity-50 cursor-not-allowed'
@@ -366,6 +382,9 @@ export const POSPage: React.FC = () => {
 
                   <p className="text-[10px] text-slate-400 mt-1">
                     {p.brandName || p.categoryName || 'Accessoire'}
+                    {productLocation && (
+                      <span className="ml-2 font-mono font-black text-amber-400">{productLocation}</span>
+                    )}
                   </p>
 
                   {p.colors && p.colors.length > 0 && (
@@ -382,11 +401,11 @@ export const POSPage: React.FC = () => {
                   )}
 
                   {/* Compatible Motorcycles Badges */}
-                  {(p as any).compatibleModels && (p as any).compatibleModels.length > 0 && (
+                  {compatModels.length > 0 && (
                     <div className="flex items-center gap-1 mt-2 overflow-hidden">
                       <Bike className="w-3 h-3 text-blue-400 shrink-0" />
                       <span className="text-[10px] text-blue-400 font-bold truncate">
-                        {(p as any).compatibleModels.map((m: any) => m.name).join(', ')}
+                        {compatModels.map((m: any) => m.name).join(', ')}
                       </span>
                     </div>
                   )}
@@ -399,6 +418,55 @@ export const POSPage: React.FC = () => {
               </div>
             );
           })}
+
+          {/* Hover Tooltip — Red Moto Info Card (appears after 2s hover) */}
+          {hoveredProduct && (() => {
+            const compat = (hoveredProduct as any).compatibleModels || [];
+            const loc = (hoveredProduct as any).location || '';
+            return (
+              <div
+                className="fixed z-[9999] pointer-events-none"
+                style={{ left: Math.min(tooltipPos.x, window.innerWidth - 280), top: Math.max(tooltipPos.y - 20, 10) }}
+              >
+                <div className="bg-rose-950/95 border border-rose-700/80 backdrop-blur-md rounded-2xl p-4 w-64 shadow-2xl shadow-rose-900/50 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-rose-800/50">
+                    <div className="w-6 h-6 rounded-full bg-rose-600 flex items-center justify-center">
+                      <Bike className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-rose-200 font-black text-[11px] line-clamp-1">{hoveredProduct.name}</p>
+                      <p className="text-rose-400 font-mono text-[10px]">{hoveredProduct.code}</p>
+                    </div>
+                  </div>
+                  {loc && (
+                    <div className="mb-2 flex items-center gap-1.5">
+                      <span className="text-[10px] text-rose-400 font-bold uppercase">{isAr ? 'موقع:' : 'Emplacement:'}</span>
+                      <span className="font-mono font-black text-amber-300 text-xs">{loc}</span>
+                    </div>
+                  )}
+                  {compat.length > 0 ? (
+                    <>
+                      <p className="text-[10px] text-rose-400 font-bold uppercase mb-2">
+                        {isAr ? `متوافق مع ${compat.length} طراز موتو:` : `Compatible ${compat.length} moto(s):`}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {compat.map((m: any) => (
+                          <span key={m.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-900/60 text-rose-200 border border-rose-700/50">
+                            <Bike className="w-2.5 h-2.5" />
+                            {m.name}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-[10px] text-rose-500 italic">
+                      {isAr ? 'لا توجد موتوات متوافقة محددة' : 'Aucun modèle moto spécifié'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
