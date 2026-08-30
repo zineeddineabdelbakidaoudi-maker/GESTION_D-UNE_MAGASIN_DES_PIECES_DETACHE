@@ -19,6 +19,7 @@ import auditRoutes from './routes/audit';
 import zakatRoutes from './routes/zakat';
 import settingsRoutes from './routes/settings';
 import syncRoutes from './routes/sync';
+import depensesRoutes from './routes/depenses';
 
 dotenv.config();
 
@@ -50,6 +51,7 @@ app.use('/api/sales', salesRoutes);
 app.use('/api/clients', clientsRoutes);
 app.use('/api/suppliers', suppliersRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/depenses', depensesRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/zakat', zakatRoutes);
 app.use('/api/settings', settingsRoutes);

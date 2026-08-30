@@ -15,6 +15,7 @@ export const productCreateSchema = z.object({
   priceSemiGros: z.number().min(0, 'Prix semi-gros invalide'),
   priceGros: z.number().min(0, 'Prix gros invalide'),
   colorMode: z.enum(COLOR_MODES),
+  location: z.string().optional().default(''),
   barcodes: z.array(z.string().min(1)).max(5, 'Maximum 5 codes-barres par produit').optional(),
   colorIds: z.array(z.number()).optional(),
   mergeColorIds: z.array(z.number()).optional(), // for merged mode
@@ -153,6 +154,7 @@ export const storeSettingsSchema = z.object({
   nif: z.string().optional().default(''),
   nis: z.string().optional().default(''),
   rc: z.string().optional().default(''),
-  articleImposition: z.string().optional().default('')
+  articleImposition: z.string().optional().default(''),
+  avgPriceMode: z.boolean().optional().default(true)
 });
 export const updateSettingsSchema = storeSettingsSchema;

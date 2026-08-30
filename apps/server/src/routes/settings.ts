@@ -28,8 +28,8 @@ router.put('/:storeId', authenticateToken, requirePermission('settings', 'edit')
 
   try {
     const upsert = rawDb.prepare(`
-      INSERT INTO settings (store_id, store_name, address, phone, logo_url, printer_type, printer_target, receipt_footer, tax_rate, nif, nis, rc, article_imposition)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO settings (store_id, store_name, address, phone, logo_url, printer_type, printer_target, receipt_footer, tax_rate, nif, nis, rc, article_imposition, avg_price_mode)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(store_id) DO UPDATE SET
         store_name = excluded.store_name,
         address = excluded.address,
@@ -42,7 +42,8 @@ router.put('/:storeId', authenticateToken, requirePermission('settings', 'edit')
         nif = excluded.nif,
         nis = excluded.nis,
         rc = excluded.rc,
-        article_imposition = excluded.article_imposition
+        article_imposition = excluded.article_imposition,
+        avg_price_mode = excluded.avg_price_mode
     `);
 
     upsert.run(
@@ -58,7 +59,8 @@ router.put('/:storeId', authenticateToken, requirePermission('settings', 'edit')
       d.nif || null,
       d.nis || null,
       d.rc || null,
-      d.articleImposition || null
+      d.articleImposition || null,
+      d.avgPriceMode !== undefined ? (d.avgPriceMode ? 1 : 0) : 1
     );
 
     res.json({ storeId, ...d });

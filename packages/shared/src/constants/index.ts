@@ -28,6 +28,7 @@ export const SYSTEM_MODULES = [
   'stock',
   'achat',
   'rapport',
+  'depenses',
   'zakat',
   'settings',
   'users'
@@ -43,6 +44,7 @@ export const MODULE_LABELS: Record<SystemModule, string> = {
   stock: 'Gestion des Stocks',
   achat: 'Bons d\'Achat',
   rapport: 'Rapports & Statistiques',
+  depenses: 'Dépenses & Charges',
   zakat: 'Calculateur de Zakat',
   settings: 'Paramètres & Profil',
   users: 'Gestion des Utilisateurs'

@@ -81,6 +81,10 @@ router.post('/', authenticateToken, requirePermission('achat', 'edit'), (req: Au
       VALUES (?, ?, ?, ?, ?, ?, ?, 'purchase', ?)
     `);
 
+    // Get avg_price_mode setting
+    const purchaseSettings = rawDb.prepare('SELECT avg_price_mode FROM settings WHERE store_id = ?').get(storeId) as any;
+    const avgPriceMode = purchaseSettings ? (purchaseSettings.avg_price_mode || 1) : 1;
+
     for (const it of items) {
       insertItem.run(purchaseId, it.productId, it.qty, it.unitCost, it.qty * it.unitCost);
 
@@ -91,6 +95,17 @@ router.post('/', authenticateToken, requirePermission('achat', 'edit'), (req: Au
 
       // Update Stock
       updateStock.run(it.productId, storeId, qtyAfter);
+
+      // Update product price_achat based on avg_price_mode setting
+      const existingProduct = rawDb.prepare('SELECT price_achat FROM products WHERE id = ?').get(it.productId) as any;
+      if (existingProduct) {
+        let newPriceAchat = it.unitCost;
+        if (avgPriceMode === 1 && existingProduct.price_achat > 0 && it.unitCost !== existingProduct.price_achat) {
+          // Average mode: (old_price + new_price) / 2
+          newPriceAchat = Math.round((existingProduct.price_achat + it.unitCost) / 2);
+        }
+        rawDb.prepare('UPDATE products SET price_achat = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newPriceAchat, it.productId);
+      }
 
       // STOCK MOVEMENT CODE 90 (Achats)
       insertMovement.run(

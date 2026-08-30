@@ -64,6 +64,18 @@ router.get('/', authenticateToken, requirePermission('rapport', 'view'), (req, r
         WHERE ${purchaseDateCond} ${purchaseStoreFilter}
       `).get(...params) as any;
 
+      // 3b. Dépenses Total
+      let depDateCond = dateCondition.replace(/s\.created_at/g, 'd.depense_date');
+      let depStoreFilter = storeFilter.replace(/s\.store_id/g, 'd.store_id');
+      const depStat = rawDb.prepare(`
+        SELECT COALESCE(SUM(d.amount), 0) as totalDepenses
+        FROM depenses d
+        WHERE ${depDateCond} ${depStoreFilter}
+      `).get(...params) as any;
+      const totalDepenses = depStat?.totalDepenses || 0;
+      const totalBeneficesBrut = profitStat?.totalBenefice || 0;
+      const totalBenefices = Math.max(0, totalBeneficesBrut - totalDepenses);
+
       // 4. Client Debts Total (Overall unpaid)
       const clientDebts = rawDb.prepare(`
         SELECT 
@@ -132,7 +144,9 @@ router.get('/', authenticateToken, requirePermission('rapport', 'view'), (req, r
         storeId,
         salesCount: salesStat?.salesCount || 0,
         totalCA: salesStat?.totalCA || 0,
-        totalBenefices: profitStat?.totalBenefice || 0,
+        totalBeneficesBrut,
+        totalDepenses,
+        totalBenefices,
         totalAchats: purchasesStat?.totalAchats || 0,
         totalDetteClients: Math.max(0, clientDebts?.totalDetteClients || 0),
         totalDetteFournisseurs: Math.max(0, supplierDebts?.totalDetteFournisseurs || 0),

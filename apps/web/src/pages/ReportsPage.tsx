@@ -91,7 +91,7 @@ export const ReportsPage: React.FC = () => {
 
       {/* KPI Cards Grid */}
       {data && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className={`p-5 rounded-3xl border shadow-sm space-y-2 ${
             isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -110,7 +110,21 @@ export const ReportsPage: React.FC = () => {
             isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
           }`}>
             <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Bénéfices Nets (35%)</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider">Dépenses & Charges</span>
+              <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
+                <Truck className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-rose-400 font-mono">
+              {formatDZD((data as any).totalDepenses || 0)}
+            </div>
+          </div>
+
+          <div className={`p-5 rounded-3xl border shadow-sm space-y-2 ${
+            isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[11px] font-bold uppercase tracking-wider">Bénéfice Net</span>
               <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
                 <TrendingUp className="w-4 h-4" />
               </div>
@@ -139,11 +153,11 @@ export const ReportsPage: React.FC = () => {
           }`}>
             <div className="flex items-center justify-between text-slate-400">
               <span className="text-[11px] font-bold uppercase tracking-wider">Dettes Clients</span>
-              <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
                 <CreditCard className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-2xl font-black text-rose-400 font-mono">
+            <div className="text-2xl font-black text-amber-400 font-mono">
               {formatDZD(data.totalDetteClients)}
             </div>
           </div>

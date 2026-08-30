@@ -110,8 +110,8 @@ router.post('/', authenticateToken, requirePermission('produits', 'edit'), (req:
 
     // Insert Product
     const insertProd = rawDb.prepare(`
-      INSERT INTO products (id, code, name, category_id, brand_id, price_achat, price_detail, price_semi_gros, price_gros, color_mode)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO products (id, code, name, category_id, brand_id, price_achat, price_detail, price_semi_gros, price_gros, color_mode, location)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     insertProd.run(
       nextId,
@@ -123,7 +123,8 @@ router.post('/', authenticateToken, requirePermission('produits', 'edit'), (req:
       data.priceDetail,
       data.priceSemiGros || data.priceDetail,
       data.priceGros || data.priceDetail,
-      data.colorMode
+      data.colorMode,
+      data.location || ''
     );
 
     // Barcodes (up to 5)
@@ -175,6 +176,73 @@ router.post('/', authenticateToken, requirePermission('produits', 'edit'), (req:
     res.status(201).json({ id: nextId, code, ...data });
   } catch (err: any) {
     res.status(500).json({ error: 'Erreur lors de la création du produit', details: err.message });
+  }
+});
+
+// PUT /api/products/:id (Update product)
+router.put('/:id', authenticateToken, requirePermission('produits', 'edit'), (req: AuthRequest, res: Response) => {
+  const productId = parseInt(req.params.id, 10);
+  const data = req.body;
+  const { rawDb } = getDb();
+
+  try {
+    // Read avg_price_mode from settings
+    const settings = rawDb.prepare('SELECT avg_price_mode FROM settings WHERE store_id = 1').get() as any;
+    const avgPriceMode = settings ? settings.avg_price_mode : 1;
+
+    let finalPriceAchat = data.priceAchat;
+    if (avgPriceMode === 1) {
+      const existing = rawDb.prepare('SELECT price_achat FROM products WHERE id = ?').get(productId) as any;
+      if (existing && existing.price_achat > 0 && data.priceAchat !== existing.price_achat) {
+        finalPriceAchat = Math.round((existing.price_achat + data.priceAchat) / 2);
+      }
+    }
+
+    rawDb.prepare(`
+      UPDATE products SET name=?, category_id=?, brand_id=?, price_achat=?, price_detail=?, price_semi_gros=?, price_gros=?, color_mode=?, location=?, updated_at=CURRENT_TIMESTAMP
+      WHERE id=?
+    `).run(
+      data.name,
+      data.categoryId || null,
+      data.brandId || null,
+      finalPriceAchat,
+      data.priceDetail,
+      data.priceSemiGros || data.priceDetail,
+      data.priceGros || data.priceDetail,
+      data.colorMode || 'single',
+      data.location || '',
+      productId
+    );
+
+    // Update colors
+    rawDb.prepare('DELETE FROM product_colors WHERE product_id = ?').run(productId);
+    const insertColor = rawDb.prepare('INSERT INTO product_colors (product_id, color_id, merge_group_id) VALUES (?, ?, ?)');
+    if (data.colorMode === 'single' && data.colorIds && data.colorIds.length > 0) {
+      insertColor.run(productId, data.colorIds[0], null);
+    } else if (data.colorMode === 'variants' && data.colorIds) {
+      for (const cid of data.colorIds) insertColor.run(productId, cid, null);
+    } else if (data.colorMode === 'merged' && data.mergeColorIds) {
+      const mergeGroupId = `merge-${productId}-${Date.now()}`;
+      for (const cid of data.mergeColorIds) insertColor.run(productId, cid, mergeGroupId);
+    }
+
+    // Update motorcycle compat
+    rawDb.prepare('DELETE FROM product_motorcycle_compat WHERE product_id = ?').run(productId);
+    if (data.compatibleModelIds && data.compatibleModelIds.length > 0) {
+      const insertCompat = rawDb.prepare('INSERT INTO product_motorcycle_compat (product_id, motorcycle_model_id) VALUES (?, ?)');
+      for (const mid of data.compatibleModelIds) insertCompat.run(productId, mid);
+    }
+
+    // Update barcodes
+    if (data.barcodes && data.barcodes.length > 0) {
+      rawDb.prepare('DELETE FROM product_barcodes WHERE product_id = ?').run(productId);
+      const insertBarcode = rawDb.prepare('INSERT INTO product_barcodes (product_id, barcode_value, source) VALUES (?, ?, ?)');
+      for (const bc of data.barcodes.slice(0, 5)) insertBarcode.run(productId, bc, 'manual');
+    }
+
+    res.json({ success: true, id: productId, finalPriceAchat });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erreur lors de la mise à jour du produit', details: err.message });
   }
 });
 

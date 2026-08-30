@@ -100,6 +100,7 @@ function initSqliteTables(sqlite: any) {
       price_semi_gros INTEGER NOT NULL DEFAULT 0,
       price_gros INTEGER NOT NULL DEFAULT 0,
       color_mode TEXT NOT NULL DEFAULT 'single',
+      location TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -284,7 +285,29 @@ function initSqliteTables(sqlite: any) {
       nif TEXT DEFAULT '',
       nis TEXT DEFAULT '',
       rc TEXT DEFAULT '',
-      article_imposition TEXT DEFAULT ''
+      article_imposition TEXT DEFAULT '',
+      avg_price_mode INTEGER NOT NULL DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS expense_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE
+    );
+
+    CREATE TABLE IF NOT EXISTS depenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      store_id INTEGER NOT NULL REFERENCES stores(id),
+      category_id INTEGER NOT NULL REFERENCES expense_categories(id),
+      amount INTEGER NOT NULL,
+      note TEXT DEFAULT '',
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      depense_date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS keyboard_shortcuts (
+      action TEXT PRIMARY KEY,
+      shortcut TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS zakat_snapshots (
@@ -336,5 +359,9 @@ function initSqliteTables(sqlite: any) {
     CREATE INDEX IF NOT EXISTS idx_purchase_items_pur ON purchase_items(purchase_id, product_id);
     CREATE INDEX IF NOT EXISTS idx_client_tx_client ON client_transactions(client_id);
     CREATE INDEX IF NOT EXISTS idx_supp_tx_supp ON supplier_transactions(supplier_id);
+    CREATE INDEX IF NOT EXISTS idx_depenses_store_date ON depenses(store_id, depense_date);
   `);
+
+  try { sqlite.exec(`ALTER TABLE products ADD COLUMN location TEXT NOT NULL DEFAULT ''`); } catch {}
+  try { sqlite.exec(`ALTER TABLE settings ADD COLUMN avg_price_mode INTEGER NOT NULL DEFAULT 1`); } catch {}
 }

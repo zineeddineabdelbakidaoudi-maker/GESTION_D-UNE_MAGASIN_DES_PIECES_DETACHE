@@ -1028,6 +1028,34 @@ pub fn create_purchase(state: State<DbState>, payload: Value) -> Result<Value, S
              VALUES (?1, ?2, 90, ?3, ?4, ?5, ?6, 'purchase', ?7)",
             params![pid, store_id, qty_before, qty_after, qty, user_id, purchase_id],
         );
+
+        // Update product price_achat based on avg_price_mode setting
+        let avg_price_mode: i64 = conn
+            .query_row(
+                "SELECT COALESCE(avg_price_mode, 1) FROM settings WHERE store_id = ?1",
+                params![store_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(1);
+
+        let old_price: i64 = conn
+            .query_row(
+                "SELECT price_achat FROM products WHERE id = ?1",
+                params![pid],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+
+        let new_price_achat = if avg_price_mode == 1 && old_price > 0 && uc != old_price {
+            (old_price + uc) / 2
+        } else {
+            uc
+        };
+
+        let _ = conn.execute(
+            "UPDATE products SET price_achat = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+            params![new_price_achat, pid],
+        );
     }
 
     let debt = total - amount_paid;
