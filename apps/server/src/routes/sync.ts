@@ -17,14 +17,57 @@ router.post('/push', (req, res) => {
   try {
     const { storeId, sales, returns, purchases, stockMovements, clientTransactions, supplierTransactions, stockTransfers, depenses } = payload;
 
-    // Apply Sales
+    // Apply Sales & Sale Items
     if (sales && sales.length > 0) {
       const insertSale = rawDb.prepare(`
-        INSERT OR IGNORE INTO sales (id, store_id, client_id, user_id, cash_session_id, subtotal, discount, total, amount_paid, amount_credit, payment_type, status, created_at)
+        INSERT INTO sales (id, store_id, client_id, user_id, cash_session_id, subtotal, discount, total, amount_paid, amount_credit, payment_type, status, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          subtotal = excluded.subtotal,
+          discount = excluded.discount,
+          total = excluded.total,
+          amount_paid = excluded.amount_paid,
+          amount_credit = excluded.amount_credit,
+          status = excluded.status
       `);
-      for (const s of sales) {
-        insertSale.run(s.id, storeId, s.clientId || null, s.userId, s.cashSessionId || null, s.subtotal, s.discount || 0, s.total, s.amountPaid, s.amountCredit, s.paymentType, s.status, s.createdAt);
+
+      const insertSaleItem = rawDb.prepare(`
+        INSERT INTO sale_items (sale_id, product_id, price_tier, qty, unit_price, line_total)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const item of sales) {
+        const s = item as any;
+        insertSale.run(
+          s.id,
+          s.storeId || s.store_id || storeId || 1,
+          s.clientId || s.client_id || null,
+          s.userId || s.user_id || 1,
+          s.cashSessionId || s.cash_session_id || null,
+          s.subtotal || s.total,
+          s.discount || 0,
+          s.total,
+          s.amountPaid || s.amount_paid || s.total,
+          s.amountCredit || s.amount_credit || 0,
+          s.paymentType || s.payment_type || 'cash',
+          s.status || 'completed',
+          s.createdAt || s.created_at || new Date().toISOString()
+        );
+
+        if (s.items && Array.isArray(s.items) && s.items.length > 0) {
+          rawDb.prepare('DELETE FROM sale_items WHERE sale_id = ?').run(s.id);
+          for (const rawIt of s.items) {
+            const it = rawIt as any;
+            insertSaleItem.run(
+              s.id,
+              it.productId || it.product_id || 1,
+              it.priceTier || it.price_tier || 'detail',
+              it.qty || 1,
+              it.unitPrice || it.unit_price || 0,
+              it.lineTotal || it.line_total || ((it.qty || 1) * (it.unitPrice || it.unit_price || 0))
+            );
+          }
+        }
       }
     }
 
@@ -34,8 +77,9 @@ router.post('/push', (req, res) => {
         INSERT OR IGNORE INTO returns (id, sale_id, store_id, user_id, total_refund, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
       `);
-      for (const r of returns) {
-        insertReturn.run(r.id, r.saleId, storeId, r.userId, r.totalRefund, r.createdAt);
+      for (const rawR of returns) {
+        const r = rawR as any;
+        insertReturn.run(r.id, r.saleId || r.sale_id, storeId, r.userId || r.user_id || 1, r.totalRefund || r.total_refund, r.createdAt || r.created_at || new Date().toISOString());
       }
     }
 
@@ -45,8 +89,9 @@ router.post('/push', (req, res) => {
         INSERT OR IGNORE INTO purchases (id, store_id, supplier_id, user_id, total, amount_paid, payment_type, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      for (const p of purchases) {
-        insertPurchase.run(p.id, storeId, p.supplierId, p.userId, p.total, p.amountPaid, p.paymentType, p.createdAt);
+      for (const rawP of purchases) {
+        const p = rawP as any;
+        insertPurchase.run(p.id, storeId, p.supplierId || p.supplier_id || null, p.userId || p.user_id || 1, p.total, p.amountPaid || p.amount_paid || p.total, p.paymentType || p.payment_type || 'cash', p.createdAt || p.created_at || new Date().toISOString());
       }
     }
 
@@ -56,8 +101,21 @@ router.post('/push', (req, res) => {
         INSERT OR IGNORE INTO stock_movements (id, product_id, store_id, movement_code, qty_before, qty_after, delta, user_id, ref_type, ref_id, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      for (const sm of stockMovements) {
-        insertMovement.run(sm.id, sm.productId, storeId, sm.movementCode, sm.qtyBefore, sm.qtyAfter, sm.delta, sm.userId, sm.refType || null, sm.refId || null, sm.createdAt);
+      for (const rawSm of stockMovements) {
+        const sm = rawSm as any;
+        insertMovement.run(
+          sm.id,
+          sm.productId || sm.product_id,
+          storeId,
+          sm.movementCode || sm.movement_code,
+          sm.qtyBefore !== undefined ? sm.qtyBefore : (sm.qty_before || 0),
+          sm.qtyAfter !== undefined ? sm.qtyAfter : (sm.qty_after || 0),
+          sm.delta,
+          sm.userId || sm.user_id || 1,
+          sm.refType || sm.ref_type || null,
+          sm.refId || sm.ref_id || null,
+          sm.createdAt || sm.created_at || new Date().toISOString()
+        );
       }
     }
 
@@ -67,8 +125,9 @@ router.post('/push', (req, res) => {
         INSERT OR IGNORE INTO client_transactions (id, client_id, type, amount, note, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
       `);
-      for (const tx of clientTransactions) {
-        insertTx.run(tx.id, tx.clientId, tx.type, tx.amount, tx.note || null, tx.createdAt);
+      for (const rawTx of clientTransactions) {
+        const tx = rawTx as any;
+        insertTx.run(tx.id, tx.clientId || tx.client_id, tx.type, tx.amount, tx.note || null, tx.createdAt || tx.created_at || new Date().toISOString());
       }
     }
 
@@ -78,8 +137,9 @@ router.post('/push', (req, res) => {
         INSERT OR IGNORE INTO supplier_transactions (id, supplier_id, type, amount, note, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
       `);
-      for (const tx of supplierTransactions) {
-        insertTx.run(tx.id, tx.supplierId, tx.type, tx.amount, tx.note || null, tx.createdAt);
+      for (const rawTx of supplierTransactions) {
+        const tx = rawTx as any;
+        insertTx.run(tx.id, tx.supplierId || tx.supplier_id, tx.type, tx.amount, tx.note || null, tx.createdAt || tx.created_at || new Date().toISOString());
       }
     }
 
@@ -89,8 +149,9 @@ router.post('/push', (req, res) => {
         INSERT OR IGNORE INTO stock_transfers (id, from_store_id, to_store_id, product_id, qty, user_id, note, status, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      for (const st of stockTransfers) {
-        insertTransfer.run(st.id, st.fromStoreId, st.toStoreId, st.productId, st.qty, st.userId, st.note || null, (st as any).status || 'completed', st.createdAt);
+      for (const rawSt of stockTransfers) {
+        const st = rawSt as any;
+        insertTransfer.run(st.id, st.fromStoreId || st.from_store_id, st.toStoreId || st.to_store_id, st.productId || st.product_id, st.qty, st.userId || st.user_id || 1, st.note || null, st.status || 'completed', st.createdAt || st.created_at || new Date().toISOString());
       }
     }
 
@@ -100,8 +161,18 @@ router.post('/push', (req, res) => {
         INSERT OR IGNORE INTO depenses (id, store_id, category_id, amount, note, user_id, depense_date, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      for (const d of depenses) {
-        insertDep.run(d.id, storeId, d.categoryId, d.amount, d.note || null, d.userId || 1, d.depenseDate || d.createdAt, d.createdAt || new Date().toISOString());
+      for (const rawD of depenses) {
+        const d = rawD as any;
+        insertDep.run(
+          d.id,
+          storeId,
+          d.categoryId || d.category_id,
+          d.amount,
+          d.note || null,
+          d.userId || d.user_id || 1,
+          d.depenseDate || d.depense_date || d.createdAt || d.created_at,
+          d.createdAt || d.created_at || new Date().toISOString()
+        );
       }
     }
 
@@ -112,8 +183,13 @@ router.post('/push', (req, res) => {
         VALUES (?, ?, ?)
         ON CONFLICT(product_id, store_id) DO UPDATE SET quantity = excluded.quantity
       `);
-      for (const sm of stockMovements) {
-        updateStock.run(sm.productId, storeId, sm.qtyAfter);
+      for (const rawSm of stockMovements) {
+        const sm = rawSm as any;
+        const pId = sm.productId || sm.product_id;
+        const qAfter = sm.qtyAfter !== undefined ? sm.qtyAfter : sm.qty_after;
+        if (pId && qAfter !== undefined) {
+          updateStock.run(pId, storeId, qAfter);
+        }
       }
     }
 

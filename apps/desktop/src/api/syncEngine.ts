@@ -32,10 +32,11 @@ export async function runFullSync(storeId: number = 1): Promise<SyncResult> {
 
   try {
     // 1. Gather local data to push
-    const [sales, depenses, products] = await Promise.all([
+    const [sales, depenses, stockMovements, purchases] = await Promise.all([
       invokeIpc<any[]>('get-sales', { storeId }).catch(() => []),
       invokeIpc<any[]>('get-depenses', { storeId }).catch(() => []),
-      invokeIpc<any[]>('get-products', { storeId }).catch(() => [])
+      invokeIpc<any[]>('get-stock-movements', { storeId, limit: 300 }).catch(() => []),
+      invokeIpc<any[]>('get-purchases', { storeId }).catch(() => [])
     ]);
 
     // Format Push Payload
@@ -43,8 +44,8 @@ export async function runFullSync(storeId: number = 1): Promise<SyncResult> {
       storeId,
       sales: sales || [],
       returns: [],
-      purchases: [],
-      stockMovements: [],
+      purchases: purchases || [],
+      stockMovements: stockMovements || [],
       clientTransactions: [],
       supplierTransactions: [],
       stockTransfers: [],
