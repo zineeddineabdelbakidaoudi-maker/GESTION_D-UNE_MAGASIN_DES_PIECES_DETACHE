@@ -5,14 +5,19 @@ import { calculateTrialState } from '@gestion-veloo/shared';
 const BUILD_TIME = process.env.BUILD_TIME ? parseInt(process.env.BUILD_TIME, 10) : Date.now();
 
 export function trialMiddleware(req: Request, res: Response, next: NextFunction) {
+  // Always allow CORS preflights
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
   const trial = calculateTrialState(BUILD_TIME);
 
   // Attach trial info to response headers
   res.setHeader('X-Trial-Expired', trial.isExpired.toString());
   res.setHeader('X-Trial-Remaining-Hours', trial.remainingHours.toString());
 
-  // Allow getting trial status freely
-  if (req.path === '/api/trial-status' || req.path === '/api/auth/login') {
+  // Allow getting trial status and authentication freely
+  if (req.path === '/api/trial-status' || req.path.startsWith('/api/auth')) {
     return next();
   }
 
