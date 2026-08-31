@@ -5,9 +5,9 @@ import { STOCK_MOVEMENT_CODES } from '@gestion-veloo/shared';
 
 const router = Router();
 
-// GET /api/audit/movements (With Code 90 filter & before/after quantities)
-router.get('/movements', authenticateToken, requirePermission('stock', 'view'), (req: AuthRequest, res: Response) => {
-  const { storeId, movementCode, productId, limit = '50', offset = '0' } = req.query;
+const handleStockMovements = (req: AuthRequest, res: Response) => {
+  const { storeId, movementCode, code, productId, limit = '100', offset = '0' } = req.query;
+  const targetCode = code || movementCode;
   const { rawDb, isPg } = getDb();
 
   if (isPg) {
@@ -16,14 +16,16 @@ router.get('/movements', authenticateToken, requirePermission('stock', 'view'), 
   }
 
   let sql = `
-    SELECT sm.*, 
-           p.code as product_code, p.name as product_name,
-           u.full_name as user_full_name,
-           s.name as store_name
+    SELECT sm.id, sm.product_id as productId, sm.store_id as storeId, sm.movement_code as movementCode,
+           sm.qty_before as qtyBefore, sm.qty_after as qtyAfter, sm.delta, sm.user_id as userId,
+           sm.ref_type as refType, sm.ref_id as refId, sm.created_at as createdAt,
+           p.code as productCode, p.name as productName,
+           u.full_name as userName,
+           s.name as storeName
     FROM stock_movements sm
-    JOIN products p ON sm.product_id = p.id
-    JOIN users u ON sm.user_id = u.id
-    JOIN stores s ON sm.store_id = s.id
+    LEFT JOIN products p ON sm.product_id = p.id
+    LEFT JOIN users u ON sm.user_id = u.id
+    LEFT JOIN stores s ON sm.store_id = s.id
     WHERE 1=1
   `;
   const params: any[] = [];
@@ -32,9 +34,9 @@ router.get('/movements', authenticateToken, requirePermission('stock', 'view'), 
     sql += ' AND sm.store_id = ?';
     params.push(storeId);
   }
-  if (movementCode) {
+  if (targetCode) {
     sql += ' AND sm.movement_code = ?';
-    params.push(movementCode);
+    params.push(targetCode);
   }
   if (productId) {
     sql += ' AND sm.product_id = ?';
@@ -44,9 +46,17 @@ router.get('/movements', authenticateToken, requirePermission('stock', 'view'), 
   sql += ' ORDER BY sm.id DESC LIMIT ? OFFSET ?';
   params.push(parseInt(limit as string, 10), parseInt(offset as string, 10));
 
-  const rows = rawDb.prepare(sql).all(...params);
-  res.json(rows);
-});
+  try {
+    const rows = rawDb.prepare(sql).all(...params);
+    res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// GET /api/audit/movements & /api/audit/stock-movements
+router.get('/movements', authenticateToken, requirePermission('stock', 'view'), handleStockMovements);
+router.get('/stock-movements', authenticateToken, requirePermission('stock', 'view'), handleStockMovements);
 
 // GET /api/audit/activities (Log of user actions)
 router.get('/activities', authenticateToken, requirePermission('rapport', 'view'), (req: AuthRequest, res: Response) => {

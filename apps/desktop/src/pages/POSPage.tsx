@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useStore, CartItem } from '../store/useStore';
 import { invokeIpc } from '../api/electronBridge';
+import { runFullSync } from '../api/syncEngine';
 import { Product, Client, PriceTier, PaymentMethod } from '@gestion-veloo/shared';
 import { formatDZD } from '@gestion-veloo/shared';
 import { PRICE_TIER_LABELS } from '@gestion-veloo/shared';
@@ -206,6 +207,9 @@ export const POSPage: React.FC = () => {
       setShowReceiptModal(true);
       clearCart();
       loadProducts();
+
+      // Automatically push sale to Cloud server in background
+      runFullSync(currentStore?.id || 1).catch(e => console.warn('Auto-sync notice:', e));
     } catch (err: any) {
       alert(`Erreur de validation de vente : ${err.message}`);
     } finally {

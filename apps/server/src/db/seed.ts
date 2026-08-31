@@ -151,13 +151,6 @@ export async function runSeed() {
     insertClient.run(3, 'Amine Coursier', '0770 45 67 89', 'Hydra, Alger', 0, 5000000);
     insertClient.run(4, 'Garage Mohamed Cycles', '0550 88 77 66', 'Oued Smar, Alger', 1, 12000000);
 
-    const insertClientTx = rawDb.prepare(`
-      INSERT OR IGNORE INTO client_transactions (id, client_id, type, amount, note)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-    insertClientTx.run(1, 2, 'achat', 3500000, 'Solde initial reporté');
-    insertClientTx.run(2, 4, 'achat', 1850000, 'Achat pièces détachées en compte');
-
     // 10. Seed Suppliers
     const insertSupplier = rawDb.prepare(`
       INSERT OR IGNORE INTO suppliers (id, name, phone, address)
@@ -167,32 +160,15 @@ export async function runSeed() {
     insertSupplier.run(2, 'Grossiste Accessoires & Casques Algérie', '021 66 77 88', 'El Eulma / Alger');
     insertSupplier.run(3, 'Distributeur Huiles & Pneumatiques DZ', '025 40 30 20', 'Blida');
 
-    const insertSupplierTx = rawDb.prepare(`
-      INSERT OR IGNORE INTO supplier_transactions (id, supplier_id, type, amount, note)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-    insertSupplierTx.run(1, 1, 'achat', 15000000, 'Facture arrivage container #CT-2026-08');
-
-    // 11. Seed Sample Completed Sales
-    const insertSale = rawDb.prepare(`
-      INSERT OR IGNORE INTO sales (id, store_id, client_id, user_id, subtotal, discount, total, amount_paid, amount_credit, payment_type, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const insertSaleItem = rawDb.prepare(`
-      INSERT OR IGNORE INTO sale_items (sale_id, product_id, price_tier, qty, unit_price, line_total)
-      VALUES (?, ?, ?, ?, ?, ?)
+    // Clean any old dummy sales or transactions on startup so the web only reflects real desktop POS sync data
+    rawDb.exec(`
+      DELETE FROM sale_items WHERE sale_id IN (1, 2, 3);
+      DELETE FROM sales WHERE id IN (1, 2, 3);
+      DELETE FROM client_transactions WHERE id IN (1, 2);
+      DELETE FROM supplier_transactions WHERE id = 1;
     `);
 
-    insertSale.run(1, 1, 1, 2, 440000, 0, 440000, 440000, 0, 'cash', 'completed');
-    insertSaleItem.run(1, 1, 'detail', 2, 220000, 440000);
-
-    insertSale.run(2, 1, 2, 2, 1100000, 0, 1100000, 500000, 600000, 'mixed', 'completed');
-    insertSaleItem.run(2, 3, 'detail', 1, 1100000, 1100000);
-
-    insertSale.run(3, 2, 4, 3, 580000, 0, 580000, 0, 580000, 'credit', 'completed');
-    insertSaleItem.run(3, 7, 'detail', 1, 580000, 580000);
-
-    console.log('✅ Database seeded successfully with stores, users, colors, models, products and rich audit logs.');
+    console.log('✅ Base de données initialisée proprement (0 ventes factices — prête pour la synchronisation réelle).');
   }
 }
 
