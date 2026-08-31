@@ -6,7 +6,7 @@ import { SyncBatchPayload } from '@gestion-veloo/shared';
 const router = Router();
 
 // POST /api/sync/push (Store pushes offline transactions to central server)
-router.post('/push', authenticateToken, (req: AuthRequest, res: Response) => {
+router.post('/push', (req, res) => {
   const payload: SyncBatchPayload = req.body;
   const { rawDb, isPg } = getDb();
 
@@ -63,23 +63,34 @@ router.post('/push', authenticateToken, (req: AuthRequest, res: Response) => {
 
     // Apply Client Transactions
     if (clientTransactions && clientTransactions.length > 0) {
-      const insertClientTx = rawDb.prepare(`
-        INSERT OR IGNORE INTO client_transactions (id, client_id, type, amount, sale_id, note, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+      const insertTx = rawDb.prepare(`
+        INSERT OR IGNORE INTO client_transactions (id, client_id, type, amount, note, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
       `);
-      for (const ct of clientTransactions) {
-        insertClientTx.run(ct.id, ct.clientId, ct.type, ct.amount, ct.saleId || null, ct.note || null, ct.createdAt);
+      for (const tx of clientTransactions) {
+        insertTx.run(tx.id, tx.clientId, tx.type, tx.amount, tx.note || null, tx.createdAt);
       }
     }
 
     // Apply Supplier Transactions
     if (supplierTransactions && supplierTransactions.length > 0) {
-      const insertSupplierTx = rawDb.prepare(`
-        INSERT OR IGNORE INTO supplier_transactions (id, supplier_id, type, amount, purchase_id, note, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+      const insertTx = rawDb.prepare(`
+        INSERT OR IGNORE INTO supplier_transactions (id, supplier_id, type, amount, note, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
       `);
-      for (const st of supplierTransactions) {
-        insertSupplierTx.run(st.id, st.supplierId, st.type, st.amount, st.purchaseId || null, st.note || null, st.createdAt);
+      for (const tx of supplierTransactions) {
+        insertTx.run(tx.id, tx.supplierId, tx.type, tx.amount, tx.note || null, tx.createdAt);
+      }
+    }
+
+    // Apply Stock Transfers
+    if (stockTransfers && stockTransfers.length > 0) {
+      const insertTransfer = rawDb.prepare(`
+        INSERT OR IGNORE INTO stock_transfers (id, from_store_id, to_store_id, product_id, qty, user_id, note, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const st of stockTransfers) {
+        insertTransfer.run(st.id, st.fromStoreId, st.toStoreId, st.productId, st.qty, st.userId, st.note || null, (st as any).status || 'completed', st.createdAt);
       }
     }
 
@@ -90,11 +101,11 @@ router.post('/push', authenticateToken, (req: AuthRequest, res: Response) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const d of depenses) {
-        insertDep.run(d.id, storeId, d.categoryId || d.category_id, d.amount, d.note || '', d.userId || d.user_id || 1, d.depenseDate || d.depense_date, d.createdAt || d.created_at);
+        insertDep.run(d.id, storeId, d.categoryId, d.amount, d.note || null, d.userId || 1, d.depenseDate || d.createdAt, d.createdAt || new Date().toISOString());
       }
     }
 
-    // Update product stock based on latest stockMovements
+    // Update Live Product Stock
     if (stockMovements && stockMovements.length > 0) {
       const updateStock = rawDb.prepare(`
         INSERT INTO product_stock (product_id, store_id, quantity)
@@ -115,9 +126,11 @@ router.post('/push', authenticateToken, (req: AuthRequest, res: Response) => {
   }
 });
 
-// GET /api/sync/pull (Store pulls updated catalog & products from server)
-router.get('/pull', authenticateToken, (req: AuthRequest, res: Response) => {
+// GET /api/sync/pull (Store pulls updated catalog & sales from server)
+router.get('/pull', (req, res) => {
   const { rawDb, isPg } = getDb();
+  const storeIdParam = req.query.storeId ? Number(req.query.storeId) : undefined;
+
   if (isPg) {
     return res.json({ success: true, syncedTimestamp: new Date().toISOString() });
   }
@@ -132,6 +145,17 @@ router.get('/pull', authenticateToken, (req: AuthRequest, res: Response) => {
   const productStock = rawDb.prepare('SELECT * FROM product_stock').all();
   const expenseCategories = rawDb.prepare('SELECT * FROM expense_categories').all();
   const settings = rawDb.prepare('SELECT * FROM settings').all();
+  
+  // Also return sales and depenses for this store
+  let sales = [];
+  let depenses = [];
+  if (storeIdParam) {
+    sales = rawDb.prepare('SELECT * FROM sales WHERE store_id = ?').all(storeIdParam);
+    depenses = rawDb.prepare('SELECT * FROM depenses WHERE store_id = ?').all(storeIdParam);
+  } else {
+    sales = rawDb.prepare('SELECT * FROM sales').all();
+    depenses = rawDb.prepare('SELECT * FROM depenses').all();
+  }
 
   res.json({
     success: true,
@@ -146,7 +170,9 @@ router.get('/pull', authenticateToken, (req: AuthRequest, res: Response) => {
       motorcycleModels,
       productStock,
       expenseCategories,
-      settings
+      settings,
+      sales,
+      depenses
     }
   });
 });

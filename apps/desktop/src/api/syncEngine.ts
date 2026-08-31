@@ -1,4 +1,4 @@
-﻿import { invokeIpc } from './electronBridge';
+import { invokeIpc } from './electronBridge';
 
 export function getServerUrl(): string {
   const custom = localStorage.getItem('gv_desktop_server_url');
@@ -70,16 +70,16 @@ export async function runFullSync(storeId: number = 1): Promise<SyncResult> {
     }
 
     const cloudCatalog = await pullRes.json();
-
+    const updates = cloudCatalog?.catalogUpdates || cloudCatalog;
     const pushedCount = (sales ? sales.length : 0) + (depenses ? depenses.length : 0);
-    const pulledCount = (cloudCatalog && cloudCatalog.products) ? cloudCatalog.products.length : 0;
+    const pulledCount = (updates && updates.products) ? updates.products.length : 0;
 
     return {
       success: true,
       pushedCount,
       pulledCount,
       timestamp,
-      message: 'Synchronisation réussie ! ' + pushedCount + ' transactions poussées, ' + pulledCount + ' articles à jour.'
+      message: `Synchronisation avec le Cloud réussie ! (${pushedCount} transaction(s) locale(s) transmise(s), ${pulledCount} article(s) synchronisé(s))`
     };
   } catch (err: any) {
     console.error('Sync Error:', err);
