@@ -5,9 +5,11 @@ services:
     env: node
     plan: free
     region: frankfurt
-    buildCommand: pnpm install && pnpm --filter @gestion-veloo/shared build && pnpm --filter @gestion-veloo/server build
+    buildCommand: pnpm install && pnpm rebuild better-sqlite3 && pnpm --filter @gestion-veloo/shared build && pnpm --filter @gestion-veloo/server build
     startCommand: pnpm --filter @gestion-veloo/server start
     envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
       - key: NODE_ENV
         value: production
       - key: PORT
@@ -26,6 +28,8 @@ services:
         source: /*
         destination: /index.html
     envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
       - key: VITE_API_URL
         fromService:
           type: web
