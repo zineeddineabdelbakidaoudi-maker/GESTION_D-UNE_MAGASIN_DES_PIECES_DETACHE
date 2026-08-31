@@ -15,7 +15,7 @@ router.post('/push', authenticateToken, (req: AuthRequest, res: Response) => {
   }
 
   try {
-    const { storeId, sales, returns, purchases, stockMovements, clientTransactions, supplierTransactions, stockTransfers } = payload;
+    const { storeId, sales, returns, purchases, stockMovements, clientTransactions, supplierTransactions, stockTransfers, depenses } = payload;
 
     // Apply Sales
     if (sales && sales.length > 0) {
@@ -83,6 +83,29 @@ router.post('/push', authenticateToken, (req: AuthRequest, res: Response) => {
       }
     }
 
+    // Apply Dépenses
+    if (depenses && depenses.length > 0) {
+      const insertDep = rawDb.prepare(`
+        INSERT OR IGNORE INTO depenses (id, store_id, category_id, amount, note, user_id, depense_date, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const d of depenses) {
+        insertDep.run(d.id, storeId, d.categoryId || d.category_id, d.amount, d.note || '', d.userId || d.user_id || 1, d.depenseDate || d.depense_date, d.createdAt || d.created_at);
+      }
+    }
+
+    // Update product stock based on latest stockMovements
+    if (stockMovements && stockMovements.length > 0) {
+      const updateStock = rawDb.prepare(`
+        INSERT INTO product_stock (product_id, store_id, quantity)
+        VALUES (?, ?, ?)
+        ON CONFLICT(product_id, store_id) DO UPDATE SET quantity = excluded.quantity
+      `);
+      for (const sm of stockMovements) {
+        updateStock.run(sm.productId, storeId, sm.qtyAfter);
+      }
+    }
+
     res.json({
       success: true,
       syncedTimestamp: new Date().toISOString()
@@ -107,6 +130,8 @@ router.get('/pull', authenticateToken, (req: AuthRequest, res: Response) => {
   const brands = rawDb.prepare('SELECT * FROM brands').all();
   const motorcycleModels = rawDb.prepare('SELECT * FROM motorcycle_models').all();
   const productStock = rawDb.prepare('SELECT * FROM product_stock').all();
+  const expenseCategories = rawDb.prepare('SELECT * FROM expense_categories').all();
+  const settings = rawDb.prepare('SELECT * FROM settings').all();
 
   res.json({
     success: true,
@@ -119,7 +144,9 @@ router.get('/pull', authenticateToken, (req: AuthRequest, res: Response) => {
       categories,
       brands,
       motorcycleModels,
-      productStock
+      productStock,
+      expenseCategories,
+      settings
     }
   });
 });

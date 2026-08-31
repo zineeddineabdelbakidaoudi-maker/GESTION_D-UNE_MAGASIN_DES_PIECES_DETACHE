@@ -323,6 +323,7 @@ export interface SyncBatchPayload {
   supplierTransactions: SupplierTransaction[];
   stockTransfers: StockTransfer[];
   activityLogs: ActivityLog[];
+  depenses?: any[];
 }
 
 export interface SyncResponse {

@@ -369,11 +369,19 @@ export const POSPage: React.FC = () => {
                     <span className="font-mono text-[11px] font-bold text-blue-400 bg-blue-500/20 px-2 py-0.5 rounded-md border border-blue-500/30">
                       {p.code}
                     </span>
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
-                      stockQty <= 5 ? 'bg-rose-950/50 text-rose-300 border border-rose-800/50' : 'bg-emerald-950/50 text-emerald-300 border border-emerald-800/50'
-                    }`}>
-                      {stockQty} {isAr ? 'متوفر' : 'en stock'}
-                    </span>
+                    {stockQty <= 0 ? (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-rose-600 text-white animate-pulse">
+                        {isAr ? '🚨 نفاد المخزون' : '🚨 RUPTURE'}
+                      </span>
+                    ) : stockQty <= 5 ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                        ⚠️ {stockQty} {isAr ? 'متبقي' : 'restant(s)'}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-950/50 text-emerald-300 border border-emerald-800/50">
+                        {stockQty} {isAr ? 'متوفر' : 'en stock'}
+                      </span>
+                    )}
                   </div>
 
                   <h3 className="font-bold text-white text-xs mt-2 line-clamp-2 leading-snug">

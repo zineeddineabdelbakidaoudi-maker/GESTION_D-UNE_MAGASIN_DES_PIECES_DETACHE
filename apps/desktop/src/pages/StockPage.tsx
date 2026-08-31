@@ -149,6 +149,18 @@ export const StockPage: React.FC = () => {
     }
   };
 
+  const [stockStatusFilter, setStockStatusFilter] = useState<'all' | 'low' | 'out'>('all');
+
+  const filteredStockList = stockList.filter(s => {
+    if (stockStatusFilter === 'out') return s.quantity <= 0;
+    if (stockStatusFilter === 'low') return s.quantity > 0 && s.quantity <= 5;
+    return true;
+  });
+
+  const totalOut = stockList.filter(s => s.quantity <= 0).length;
+  const totalLow = stockList.filter(s => s.quantity > 0 && s.quantity <= 5).length;
+  const totalNormal = stockList.filter(s => s.quantity > 5).length;
+
   return (
     <div className="p-6 space-y-6 h-full overflow-y-auto bg-slate-950 text-slate-100">
       {/* Top Header */}
@@ -201,6 +213,50 @@ export const StockPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Stock Alerts & Filters Chips */}
+      {activeView === 'table' && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setStockStatusFilter('all')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${
+              stockStatusFilter === 'all'
+                ? 'bg-blue-600 border-blue-500 text-white shadow-md shadow-blue-600/30'
+                : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'
+            }`}
+          >
+            <Boxes className="w-3.5 h-3.5" />
+            <span>{isAr ? 'جميع القطع' : 'Tous les articles'}</span>
+            <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px]">{stockList.length}</span>
+          </button>
+
+          <button
+            onClick={() => setStockStatusFilter('low')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${
+              stockStatusFilter === 'low'
+                ? 'bg-amber-600 border-amber-500 text-white shadow-md shadow-amber-600/30'
+                : 'bg-amber-950/30 border-amber-800/40 text-amber-300 hover:bg-amber-950/50'
+            }`}
+          >
+            <span>⚠️</span>
+            <span>{isAr ? 'مخزون منخفض (≤ 5)' : 'Stock Faible (≤ 5)'}</span>
+            <span className="px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-200 text-[10px] font-mono font-black">{totalLow}</span>
+          </button>
+
+          <button
+            onClick={() => setStockStatusFilter('out')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${
+              stockStatusFilter === 'out'
+                ? 'bg-rose-600 border-rose-500 text-white shadow-md shadow-rose-600/30'
+                : 'bg-rose-950/30 border-rose-800/40 text-rose-300 hover:bg-rose-950/50'
+            }`}
+          >
+            <span>🚨</span>
+            <span>{isAr ? 'نفاد المخزون (0)' : 'Rupture de Stock (0)'}</span>
+            <span className="px-2 py-0.5 rounded-full bg-rose-500/30 text-rose-200 text-[10px] font-mono font-black">{totalOut}</span>
+          </button>
+        </div>
+      )}
+
       {/* Search & Filters */}
       <div className="bg-slate-900 p-3 rounded-2xl border border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-3 flex-1">
@@ -243,24 +299,37 @@ export const StockPage: React.FC = () => {
                   <th className="px-4 py-3">{isAr ? 'الرمز' : 'Code'}</th>
                   <th className="px-4 py-3">{isAr ? 'تعيين القطعة' : 'Désignation'}</th>
                   <th className="px-4 py-3">{isAr ? 'المحل' : 'Boutique'}</th>
-                  <th className="px-4 py-3 text-center">{isAr ? 'الكمية (التتبع البصري السابق والحالي)' : 'Quantité (Audit Visuel Ancien &rarr; Nouveau)'}</th>
+                  <th className="px-4 py-3 text-center">{isAr ? 'الكمية وحالة المخزون' : 'Quantité & État du Stock'}</th>
                   <th className="px-4 py-3 text-right">{isAr ? 'سعر الشراء' : 'Prix Achat'}</th>
                   <th className="px-4 py-3 text-right">{isAr ? 'سعر البيع' : 'Prix Détail'}</th>
                   <th className="px-4 py-3 text-right">{isAr ? 'إجراءات' : 'Actions'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {stockList.map(s => (
-                  <tr key={`${s.productId}-${s.storeId}`} className="hover:bg-slate-800/50 transition-colors">
+                {filteredStockList.map(s => (
+                  <tr key={`${s.productId}-${s.storeId}`} className={`transition-colors ${
+                    s.quantity <= 0 ? 'bg-rose-950/20 hover:bg-rose-950/30' : s.quantity <= 5 ? 'bg-amber-950/10 hover:bg-amber-950/20' : 'hover:bg-slate-800/50'
+                  }`}>
                     <td className="px-4 py-3 font-mono font-bold text-blue-400">{s.productCode}</td>
                     <td className="px-4 py-3">
-                      <div className="font-bold text-white">{s.productName}</div>
+                      <div className="font-bold text-white flex items-center gap-2">
+                        <span>{s.productName}</span>
+                        {s.quantity <= 0 ? (
+                          <span className="px-2 py-0.5 rounded-md bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[10px] font-extrabold animate-pulse">
+                            {isAr ? '🚨 نفاد المخزون' : '🚨 RUPTURE'}
+                          </span>
+                        ) : s.quantity <= 5 ? (
+                          <span className="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-extrabold">
+                            {isAr ? '⚠️ مخزون منخفض' : '⚠️ FAIBLE'}
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="text-[10px] text-slate-500">{s.brandName} • {s.categoryName}</div>
                     </td>
 
                     <td className="px-4 py-3 font-medium text-slate-300">{s.storeName}</td>
 
-                    {/* KEY CLIENT REQUIREMENT: Highlight with old in RED and new in GREEN with exact process badge */}
+                    {/* Quantity with audit & alerts */}
                     <td className="px-4 py-3 text-center">
                       {s.hasRecentMovement && s.recentQtyBefore !== null ? (
                         <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-950/80 border border-slate-700 rounded-xl">
@@ -275,9 +344,13 @@ export const StockPage: React.FC = () => {
                         </div>
                       ) : (
                         <span className={`inline-block px-3 py-1 rounded-xl font-bold font-mono text-xs ${
-                          s.quantity <= 5 ? 'bg-rose-950/40 text-rose-300 border border-rose-800/50' : 'bg-slate-800 text-slate-200'
+                          s.quantity <= 0 
+                            ? 'bg-rose-950/70 text-rose-300 border border-rose-700/80 font-black' 
+                            : s.quantity <= 5 
+                              ? 'bg-amber-950/50 text-amber-300 border border-amber-700/60 font-black' 
+                              : 'bg-slate-800 text-slate-200'
                         }`}>
-                          {s.quantity}
+                          {s.quantity} {s.quantity <= 0 ? (isAr ? '(نافد)' : '(0 dispo)') : ''}
                         </span>
                       )}
                     </td>
