@@ -121,24 +121,24 @@ export const transferStockSchema = z.object({
 export const stockTransferSchema = transferStockSchema;
 
 export const userCreateSchema = z.object({
-  fullName: z.string().min(1, 'Nom complet requis'),
-  username: z.string().min(3, 'Identifiant d\'au moins 3 caractères requis'),
-  password: z.string().min(4, 'Mot de passe d\'au moins 4 caractères requis'),
-  storeId: z.number().optional().nullable(),
-  role: z.enum(['owner', 'manager', 'cashier']).default('cashier'),
+  fullName: z.string().min(1, 'Nom requis'),
+  username: z.string().min(1, 'Identifiant requis'),
+  password: z.string().min(1, 'Mot de passe requis'),
+  storeId: z.union([z.number(), z.string()]).transform(v => Number(v) || null).optional().nullable(),
+  role: z.string().default('cashier'),
   permissions: z.array(z.object({
-    module: z.enum(SYSTEM_MODULES),
-    canView: z.boolean(),
-    canEdit: z.boolean()
+    module: z.string(),
+    canView: z.union([z.boolean(), z.number()]).transform(v => Boolean(v)),
+    canEdit: z.union([z.boolean(), z.number()]).transform(v => Boolean(v))
   })).optional()
 });
 export const createUserSchema = userCreateSchema;
 
 export const updateUserPermissionsSchema = z.object({
   permissions: z.array(z.object({
-    module: z.enum(SYSTEM_MODULES),
-    canView: z.boolean(),
-    canEdit: z.boolean()
+    module: z.string(),
+    canView: z.union([z.boolean(), z.number()]).transform(v => Boolean(v)),
+    canEdit: z.union([z.boolean(), z.number()]).transform(v => Boolean(v))
   }))
 });
 

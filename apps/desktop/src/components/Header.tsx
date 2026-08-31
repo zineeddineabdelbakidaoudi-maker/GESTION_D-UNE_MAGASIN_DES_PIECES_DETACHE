@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { invokeIpc } from '../api/electronBridge';
+import { runFullSync } from '../api/syncEngine';
 import { formatDZD } from '@gestion-veloo/shared';
 import { 
   Building2, 
@@ -41,10 +42,18 @@ export const Header: React.FC = () => {
 
   const handleManualSync = async () => {
     setSyncing(true);
-    setTimeout(() => {
+    try {
+      const res = await runFullSync(currentStore?.id || 1);
+      if (res.success) {
+        alert(isAr ? 'تمت المزامنة بنجاح مع الخادم المركزي!' : res.message || 'Synchronisation réussie avec le serveur central !');
+      } else {
+        alert(isAr ? `خطأ في المزامنة: ${res.message}` : `Erreur de synchronisation: ${res.message}`);
+      }
+    } catch (err: any) {
+      alert(`Erreur: ${err.message}`);
+    } finally {
       setSyncing(false);
-      alert(lang === 'ar' ? 'تمت المزامنة بنجاح مع الخادم المركزي!' : 'Synchronisation réussie avec le serveur central !');
-    }, 800);
+    }
   };
 
   const handleLogout = () => {
