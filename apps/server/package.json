@@ -6,7 +6,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "seed": "tsx src/db/seed.ts"
+    "seed": "tsx src/db/seed.ts",
+    "postinstall": "npm rebuild better-sqlite3 || true"
   },
   "dependencies": {
     "@gestion-veloo/shared": "workspace:*",
