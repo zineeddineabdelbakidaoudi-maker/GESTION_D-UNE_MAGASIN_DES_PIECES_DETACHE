@@ -19,7 +19,6 @@ services:
   - type: web
     name: gestion-veloo-web
     env: static
-    plan: free
     buildCommand: pnpm install && pnpm --filter @gestion-veloo/shared build && pnpm --filter @gestion-veloo/web build
     staticPublishPath: ./apps/web/dist
     routes:
