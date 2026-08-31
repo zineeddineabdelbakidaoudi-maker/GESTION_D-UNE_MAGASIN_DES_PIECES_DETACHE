@@ -71,7 +71,7 @@ router.post('/', authenticateToken, requirePermission('users', 'edit'), async (r
 
 // PUT /api/users/:id/permissions (Update 10-module permission matrix)
 router.put('/:id/permissions', authenticateToken, requirePermission('users', 'edit'), (req: AuthRequest, res: Response) => {
-  const userId = parseInt(req.params.id, 10);
+  const userId = parseInt(String(req.params.id), 10);
   const parsed = updateUserPermissionsSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Données invalides', details: parsed.error.errors });
@@ -96,6 +96,24 @@ router.put('/:id/permissions', authenticateToken, requirePermission('users', 'ed
     res.json({ success: true, userId, permissions });
   } catch (err: any) {
     res.status(500).json({ error: 'Erreur lors de la mise à jour des permissions', details: err.message });
+  }
+});
+
+// PUT /api/users/:id/toggle-active
+router.put('/:id/toggle-active', authenticateToken, requirePermission('users', 'edit'), (req: AuthRequest, res: Response) => {
+  const userId = parseInt(String(req.params.id), 10);
+  const { rawDb } = getDb();
+
+  try {
+    const user = rawDb.prepare('SELECT is_active FROM users WHERE id = ?').get(userId) as any;
+    if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+
+    const newStatus = user.is_active ? 0 : 1;
+    rawDb.prepare('UPDATE users SET is_active = ? WHERE id = ?').run(newStatus, userId);
+
+    res.json({ success: true, userId, isActive: newStatus === 1 });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erreur lors de la mise à jour du statut', details: err.message });
   }
 });
 

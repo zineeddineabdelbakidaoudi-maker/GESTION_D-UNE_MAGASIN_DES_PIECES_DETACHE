@@ -181,7 +181,7 @@ router.post('/', authenticateToken, requirePermission('produits', 'edit'), (req:
 
 // PUT /api/products/:id (Update product)
 router.put('/:id', authenticateToken, requirePermission('produits', 'edit'), (req: AuthRequest, res: Response) => {
-  const productId = parseInt(req.params.id, 10);
+  const productId = parseInt(String(req.params.id), 10);
   const data = req.body;
   const { rawDb } = getDb();
 

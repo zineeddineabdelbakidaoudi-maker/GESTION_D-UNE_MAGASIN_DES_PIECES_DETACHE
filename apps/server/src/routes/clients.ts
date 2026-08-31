@@ -45,7 +45,7 @@ router.post('/', authenticateToken, requirePermission('clients', 'edit'), (req: 
 
 // POST /api/clients/:id/versement
 router.post('/:id/versement', authenticateToken, requirePermission('clients', 'edit'), (req: AuthRequest, res: Response) => {
-  const clientId = parseInt(req.params.id, 10);
+  const clientId = parseInt(String(req.params.id), 10);
   const parsed = clientVersementSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Données invalides', details: parsed.error.errors });

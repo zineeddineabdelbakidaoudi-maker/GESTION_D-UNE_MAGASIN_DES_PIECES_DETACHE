@@ -45,7 +45,7 @@ router.post('/', authenticateToken, requirePermission('fournisseurs', 'edit'), (
 
 // POST /api/suppliers/:id/versement
 router.post('/:id/versement', authenticateToken, requirePermission('fournisseurs', 'edit'), (req: AuthRequest, res: Response) => {
-  const supplierId = parseInt(req.params.id, 10);
+  const supplierId = parseInt(String(req.params.id), 10);
   const parsed = supplierVersementSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Données invalides', details: parsed.error.errors });

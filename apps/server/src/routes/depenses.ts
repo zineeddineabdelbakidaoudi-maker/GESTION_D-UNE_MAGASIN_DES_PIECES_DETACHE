@@ -63,7 +63,7 @@ router.post('/', authenticateToken, requirePermission('depenses', 'edit'), (req:
 router.delete('/:id', authenticateToken, requirePermission('depenses', 'edit'), (req: AuthRequest, res: Response) => {
   const { rawDb } = getDb();
   try {
-    rawDb.prepare('DELETE FROM depenses WHERE id = ?').run(req.params.id);
+    rawDb.prepare('DELETE FROM depenses WHERE id = ?').run(Number(req.params.id));
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

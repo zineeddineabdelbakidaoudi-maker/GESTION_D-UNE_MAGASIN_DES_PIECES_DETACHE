@@ -7,7 +7,7 @@ const router = Router();
 
 // GET /api/settings/:storeId
 router.get('/:storeId', authenticateToken, requirePermission('settings', 'view'), (req: AuthRequest, res: Response) => {
-  const storeId = parseInt(req.params.storeId, 10);
+  const storeId = parseInt(String(req.params.storeId), 10);
   const { rawDb, isPg } = getDb();
   if (isPg) return res.json({});
 
@@ -17,7 +17,7 @@ router.get('/:storeId', authenticateToken, requirePermission('settings', 'view')
 
 // PUT /api/settings/:storeId (Update Fiscal fields: NIF, NIS, RC, AI, Printer)
 router.put('/:storeId', authenticateToken, requirePermission('settings', 'edit'), (req: AuthRequest, res: Response) => {
-  const storeId = parseInt(req.params.storeId, 10);
+  const storeId = parseInt(String(req.params.storeId), 10);
   const parsed = updateSettingsSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Données invalides', details: parsed.error.errors });
