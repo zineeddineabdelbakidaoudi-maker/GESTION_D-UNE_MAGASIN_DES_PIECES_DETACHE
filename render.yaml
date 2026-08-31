@@ -5,7 +5,7 @@ services:
     env: node
     plan: free
     region: frankfurt
-    buildCommand: pnpm install && (cd apps/server && npm rebuild better-sqlite3 || true) && pnpm --filter @gestion-veloo/shared build && pnpm --filter @gestion-veloo/server build
+    buildCommand: pnpm install && node scripts/ensure-sqlite.js && pnpm --filter @gestion-veloo/shared build && pnpm --filter @gestion-veloo/server build
     startCommand: pnpm --filter @gestion-veloo/server start
     envVars:
       - key: NODE_VERSION
