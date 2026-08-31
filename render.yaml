@@ -20,7 +20,6 @@ services:
     name: gestion-veloo-web
     env: static
     plan: free
-    region: frankfurt
     buildCommand: pnpm install && pnpm --filter @gestion-veloo/shared build && pnpm --filter @gestion-veloo/web build
     staticPublishPath: ./apps/web/dist
     routes:
