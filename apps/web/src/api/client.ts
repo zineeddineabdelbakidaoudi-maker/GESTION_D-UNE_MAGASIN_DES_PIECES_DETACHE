@@ -1,6 +1,14 @@
 import { TrialState } from '@gestion-veloo/shared';
 
-function getApiBase(): string {
+export function getApiBase(): string {
+  // 1. Check if user configured a custom API URL in localStorage
+  const customUrl = localStorage.getItem('gv_custom_api_url');
+  if (customUrl && customUrl.trim()) {
+    let url = customUrl.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) url = `https://${url}`;
+    return `${url.replace(/\/$/, '')}/api`;
+  }
+
   let rawApiUrl = (import.meta as any).env?.VITE_API_URL || '';
 
   // If provided as "gestion-veloo-server.onrender.com" (from Render property: host)
