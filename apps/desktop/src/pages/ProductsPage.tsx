@@ -182,8 +182,8 @@ export const ProductsPage: React.FC = () => {
     try {
       const pAchat = Math.round(parseFloat(priceAchat || '0') * 100);
       const pDetail = Math.round(parseFloat(priceDetail || '0') * 100);
-      const pSemi = Math.round(parseFloat(priceSemiGros || priceDetail || '0') * 100);
-      const pGros = Math.round(parseFloat(priceGros || priceDetail || '0') * 100);
+      const pSemi = Math.round(parseFloat(priceSemiGros || '0') * 100);
+      const pGros = Math.round(parseFloat(priceGros || '0') * 100);
 
       if (!name.trim()) throw new Error(isAr ? 'اسم القطعة مطلوب' : 'Nom du produit obligatoire');
       if (pDetail <= 0) throw new Error(isAr ? 'سعر التجزئة يجب أن يكون أكبر من 0' : 'Prix détail obligatoire');
@@ -195,8 +195,8 @@ export const ProductsPage: React.FC = () => {
         brandId: brandId || null,
         priceAchat: pAchat,
         priceDetail: pDetail,
-        priceSemiGros: pSemi || pDetail,
-        priceGros: pGros || pDetail,
+        priceSemiGros: pSemi,
+        priceGros: pGros,
         location: location.toUpperCase().trim(),
         colorMode,
         colorIds: colorMode === 'single' ? (selectedColorId ? [Number(selectedColorId)] : []) : variantColorIds,
@@ -719,15 +719,14 @@ export const ProductsPage: React.FC = () => {
 
                   <div>
                     <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {isAr ? 'سعر نصف الجملة (دج) — يتبع التجزئة إذا فارغ' : 'Prix Semi-Gros (DA) — Suit détail si vide'}
+                      {isAr ? 'سعر نصف الجملة (دج)' : 'Prix Semi-Gros (DA)'}
                     </label>
                     <input
                       type="number"
                       step="0.01"
-                      placeholder={priceDetail || "0.00"}
+                      placeholder="0.00"
                       value={priceSemiGros}
                       onChange={e => setPriceSemiGros(e.target.value)}
-                      onBlur={e => { if (!e.target.value || parseFloat(e.target.value) === 0) setPriceSemiGros(priceDetail); }}
                       className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono outline-none ${
                         isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
                       }`}
@@ -736,15 +735,14 @@ export const ProductsPage: React.FC = () => {
 
                   <div>
                     <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {isAr ? 'سعر الجملة (دج) — يتبع التجزئة إذا فارغ' : 'Prix Gros (DA) — Suit détail si vide'}
+                      {isAr ? 'سعر الجملة (دج)' : 'Prix Gros (DA)'}
                     </label>
                     <input
                       type="number"
                       step="0.01"
-                      placeholder={priceDetail || "0.00"}
+                      placeholder="0.00"
                       value={priceGros}
                       onChange={e => setPriceGros(e.target.value)}
-                      onBlur={e => { if (!e.target.value || parseFloat(e.target.value) === 0) setPriceGros(priceDetail); }}
                       className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono outline-none ${
                         isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
                       }`}
