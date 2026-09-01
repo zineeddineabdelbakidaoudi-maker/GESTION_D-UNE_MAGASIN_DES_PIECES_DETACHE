@@ -1,9 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { invokeIpc } from '../api/electronBridge';
-import { Product, ColorMode } from '@gestion-veloo/shared';
+import { Product } from '@gestion-veloo/shared';
 import { formatDZD } from '@gestion-veloo/shared';
-import { COLOR_MODES, COLOR_MODE_LABELS } from '@gestion-veloo/shared';
 import { generateBarcodeValue } from '@gestion-veloo/shared';
 import { 
   PackagePlus, 
@@ -35,6 +34,11 @@ export const ProductsPage: React.FC = () => {
   const [motorcycles, setMotorcycles] = useState<any[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
 
   // Add/Edit Product Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -48,11 +52,8 @@ export const ProductsPage: React.FC = () => {
   const [priceSemiGros, setPriceSemiGros] = useState<string>('');
   const [priceGros, setPriceGros] = useState<string>('');
   const [location, setLocation] = useState<string>('');
-  const [colorMode, setColorMode] = useState<ColorMode>('single');
-  const [selectedColorId, setSelectedColorId] = useState<number | ''>('');
-  const [variantColorIds, setVariantColorIds] = useState<number[]>([]);
-  const [mergeColorIds, setMergeColorIds] = useState<number[]>([]);
-  const [manualBarcode, setManualBarcode] = useState<string>('');
+    const [selectedColorId, setSelectedColorId] = useState<number | ''>('');
+      const [manualBarcode, setManualBarcode] = useState<string>('');
   const [barcodesList, setBarcodesList] = useState<string[]>([]);
   const [compatibleMotos, setCompatibleMotos] = useState<number[]>([]);
   const [motoSearchFilter, setMotoSearchFilter] = useState('');
@@ -198,9 +199,9 @@ export const ProductsPage: React.FC = () => {
         priceSemiGros: pSemi,
         priceGros: pGros,
         location: location.toUpperCase().trim(),
-        colorMode,
-        colorIds: colorMode === 'single' ? (selectedColorId ? [Number(selectedColorId)] : []) : variantColorIds,
-        mergeColorIds: colorMode === 'merged' ? mergeColorIds : [],
+        colorMode: 'single',
+        colorIds: selectedColorId ? [Number(selectedColorId)] : [],
+        mergeColorIds: [],
         barcodes: barcodesList,
         compatibleModelIds: compatibleMotos,
         compatibleMotos: compatibleMotos,
@@ -241,11 +242,8 @@ export const ProductsPage: React.FC = () => {
     setPriceSemiGros('');
     setPriceGros('');
     setLocation('');
-    setColorMode('single');
-    setSelectedColorId('');
-    setVariantColorIds([]);
-    setMergeColorIds([]);
-    setBarcodesList([]);
+        setSelectedColorId('');
+            setBarcodesList([]);
     setManualBarcode('');
     setCompatibleMotos([]);
     setMotoSearchFilter('');
@@ -264,14 +262,11 @@ export const ProductsPage: React.FC = () => {
     setBrandId(p.brandId || '');
     setPriceAchat(String((p.priceAchat || 0) / 100));
     setPriceDetail(String((p.priceDetail || 0) / 100));
-    setPriceSemiGros(String((p.priceSemiGros || p.priceDetail || 0) / 100));
-    setPriceGros(String((p.priceGros || p.priceDetail || 0) / 100));
+    setPriceSemiGros(p.priceSemiGros ? String(p.priceSemiGros / 100) : '');
+    setPriceGros(p.priceGros ? String(p.priceGros / 100) : '');
     setLocation((p as any).location || '');
-    setColorMode(p.colorMode);
     const colorIds = (p.colors || []).map((c: any) => c.colorId);
-    if (p.colorMode === 'single') setSelectedColorId(colorIds[0] || '');
-    else if (p.colorMode === 'variants') setVariantColorIds(colorIds);
-    else if (p.colorMode === 'merged') setMergeColorIds(colorIds);
+    setSelectedColorId(colorIds[0] || '');
     setBarcodesList((p.barcodes || []).map((b: any) => b.barcodeValue));
     setCompatibleMotos(((p as any).compatibleModels || []).map((m: any) => m.id));
     setPhotoBase64((p as any).photo_base64 || '');
@@ -322,16 +317,8 @@ export const ProductsPage: React.FC = () => {
   );
 
   // Category conditional check for color picker
-  const selectedCat = categories.find(c => c.id === categoryId);
-  const catNameLower = (selectedCat?.name || '').toLowerCase();
-  const shouldShowColors = !categoryId || 
-    catNameLower.includes('carénage') || 
-    catNameLower.includes('carenage') || 
-    catNameLower.includes('carinage') || 
-    catNameLower.includes('accessoire') || 
-    catNameLower.includes('access') ||
-    catNameLower.includes('carrosserie') ||
-    catNameLower.includes('couleur');
+  const selectedCat = categories.find(c => c.id === Number(categoryId));
+  const isColorEligible = selectedCat ? /car[eéè]nage|accessoire|carrosserie|plastique|couleur/i.test(selectedCat.name) : false;
 
   return (
     <div className={`p-6 space-y-6 h-full overflow-y-auto transition-colors ${
@@ -493,11 +480,16 @@ export const ProductsPage: React.FC = () => {
                       {p.categoryName || '-'} • <span className={`font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{p.brandName || '-'}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
-                        isDark ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
-                      }`}>
-                        {COLOR_MODE_LABELS[p.colorMode]}
-                      </span>
+                      {(p.colors && p.colors.length > 0) ? (
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                          isDark ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
+                        }`}>
+                          <div className="w-2 h-2 rounded-full border border-slate-600" style={{ backgroundColor: p.colors[0].hexCode }} />
+                          <span>{p.colors[0].name}</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-500">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-slate-400">{formatDZD(p.priceAchat)}</td>
                     <td className="px-4 py-3 text-right font-bold text-emerald-400">{formatDZD(p.priceDetail)}</td>
@@ -845,18 +837,18 @@ export const ProductsPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Section 3: Colors (Conditional: only for Carénage, Accessoires, etc.) */}
-              {shouldShowColors && (
-                <div className={`space-y-3 p-4 rounded-2xl border ${
-                  isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                      isDark ? 'text-slate-300' : 'text-slate-700'
-                    }`}>
-                      <Palette className="w-3.5 h-3.5 text-purple-500" /> 3. {isAr ? 'نظام إدارة الألوان' : 'Gestion des Couleurs'}
-                    </h4>
+              {/* Section 3: Colors (Single selection, enabled for Carénage/Accessoire) */}
+              <div className="space-y-3 p-4 rounded-2xl border transition-all ${
+                isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+              }">
+                <div className="flex items-center justify-between">
+                  <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                    isDark ? 'text-slate-300' : 'text-slate-700'
+                  }`}>
+                    <Palette className="w-3.5 h-3.5 text-purple-500" /> 3. {isAr ? 'لون القطعة' : 'Couleur de la pièce'}
+                  </h4>
 
+                  {isColorEligible && (
                     <button
                       type="button"
                       onClick={() => setShowAddColorForm(!showAddColorForm)}
@@ -865,10 +857,20 @@ export const ProductsPage: React.FC = () => {
                       <Plus className="w-3 h-3" />
                       <span>{showAddColorForm ? 'Fermer' : 'Ajouter Nouvelle Couleur'}</span>
                     </button>
-                  </div>
+                  )}
+                </div>
 
+                {!isColorEligible ? (
+                  <div className="p-3 rounded-xl border border-dashed border-amber-600/40 bg-amber-500/10 text-amber-300 text-xs flex items-center gap-2">
+                    <span>🔒 {isAr ? 'حقل اللون مفعل فقط لأصناف الكاريناج والإكسسوارات' : 'Choix de couleur bloqué — Activé uniquement pour les catégories Carénage et Accessoires.'}</span>
+                  </div>
+                ) : null}
+
+                <div className={`space-y-3 transition-all ${
+                  !isColorEligible ? 'opacity-30 pointer-events-none filter blur-[0.6px] select-none' : ''
+                }`}>
                   {/* Inline Add Color Form */}
-                  {showAddColorForm && (
+                  {showAddColorForm && isColorEligible && (
                     <div className={`p-3 rounded-xl border flex items-center gap-2 ${
                       isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
                     }`}>
@@ -897,82 +899,26 @@ export const ProductsPage: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-3 gap-2">
-                    {COLOR_MODES.map(mode => (
-                      <label
-                        key={mode}
-                        onClick={() => setColorMode(mode)}
-                        className={`p-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
-                          colorMode === mode
-                            ? 'bg-blue-600/20 border-blue-500 text-blue-400'
-                            : isDark ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-300 text-slate-700'
-                        }`}
-                      >
-                        <span className="flex items-center gap-2">
-                          <input type="radio" checked={colorMode === mode} onChange={() => setColorMode(mode)} />
-                          {COLOR_MODE_LABELS[mode]}
-                        </span>
-                      </label>
-                    ))}
+                  <div>
+                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      {isAr ? 'اختر لون القطعة :' : 'Sélectionner la couleur :'}
+                    </label>
+                    <select
+                      disabled={!isColorEligible}
+                      value={selectedColorId}
+                      onChange={e => setSelectedColorId(e.target.value ? parseInt(e.target.value, 10) : '')}
+                      className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-bold outline-none ${
+                        isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                      }`}
+                    >
+                      <option value="">{isAr ? '-- بدون لون / موحد --' : '-- Sans couleur spécifique / Standard --'}</option>
+                      {colors.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
                   </div>
-
-                  {colorMode === 'single' && (
-                    <div>
-                      <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                        {isAr ? 'اختر اللون :' : 'Choisir la couleur :'}
-                      </label>
-                      <select
-                        value={selectedColorId}
-                        onChange={e => setSelectedColorId(e.target.value ? parseInt(e.target.value, 10) : '')}
-                        className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-bold outline-none ${
-                          isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
-                        }`}
-                      >
-                        <option value="">{isAr ? '-- اختر لوناً --' : '-- Sélectionner une couleur --'} ({colors.length} disponibles)</option>
-                        {colors.map(c => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {(colorMode === 'variants' || colorMode === 'merged') && (
-                    <div className="space-y-2">
-                      <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                        {colorMode === 'variants'
-                          ? (isAr ? 'اختر خيارات الألوان المتوفرة :' : 'Sélectionner les déclinaisons de couleurs :')
-                          : (isAr ? 'اختر الألوان المدمجة في نفس القطعة :' : 'Sélectionner les couleurs composant l\'article :')}
-                      </label>
-                      <div className={`max-h-36 overflow-y-auto grid grid-cols-3 gap-1.5 p-2 rounded-xl border ${
-                        isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'
-                      }`}>
-                        {colors.map(c => {
-                          const isChecked = colorMode === 'variants' ? variantColorIds.includes(c.id) : mergeColorIds.includes(c.id);
-                          return (
-                            <label key={c.id} className="flex items-center gap-1.5 text-xs cursor-pointer p-1 rounded hover:bg-blue-500/10">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={e => {
-                                  if (colorMode === 'variants') {
-                                    if (e.target.checked) setVariantColorIds([...variantColorIds, c.id]);
-                                    else setVariantColorIds(variantColorIds.filter(id => id !== c.id));
-                                  } else {
-                                    if (e.target.checked) setMergeColorIds([...mergeColorIds, c.id]);
-                                    else setMergeColorIds(mergeColorIds.filter(id => id !== c.id));
-                                  }
-                                }}
-                              />
-                              <div className="w-2.5 h-2.5 rounded-full border border-slate-600 shrink-0" style={{ backgroundColor: c.hexCode }} />
-                              <span className="truncate text-[11px]">{c.name}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </div>
-              )}
+              </div>
 
               {/* Section 4: Motos & Scooters Compatibles */}
               <div className={`space-y-3 p-4 rounded-2xl border ${

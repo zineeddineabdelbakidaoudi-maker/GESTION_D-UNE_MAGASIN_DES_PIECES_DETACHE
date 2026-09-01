@@ -886,6 +886,56 @@ ${settings?.receiptFooter || 'Merci pour votre confiance !'}
     }
   });
 
+  ipcMain.handle('delete-color', (_event, id: number) => {
+    db.prepare('DELETE FROM colors WHERE id = ?').run(id);
+    return { success: true };
+  });
+
+  // Add a new category
+  ipcMain.handle('add-category', (_event, name: string) => {
+    try {
+      const res = db.prepare('INSERT INTO categories (name) VALUES (?)').run(name.trim());
+      return { id: res.lastInsertRowid, name: name.trim() };
+    } catch (err: any) {
+      throw new Error('Catégorie déjà existante: ' + err.message);
+    }
+  });
+
+  ipcMain.handle('delete-category', (_event, id: number) => {
+    db.prepare('DELETE FROM categories WHERE id = ?').run(id);
+    return { success: true };
+  });
+
+  // Add a new brand (Marque)
+  ipcMain.handle('add-brand', (_event, name: string) => {
+    try {
+      const res = db.prepare('INSERT INTO brands (name) VALUES (?)').run(name.trim());
+      return { id: res.lastInsertRowid, name: name.trim() };
+    } catch (err: any) {
+      throw new Error('Marque déjà existante: ' + err.message);
+    }
+  });
+
+  ipcMain.handle('delete-brand', (_event, id: number) => {
+    db.prepare('DELETE FROM brands WHERE id = ?').run(id);
+    return { success: true };
+  });
+
+  // Add a new motorcycle model (Machine)
+  ipcMain.handle('add-motorcycle-model', (_event, name: string) => {
+    try {
+      const res = db.prepare('INSERT INTO motorcycle_models (name) VALUES (?)').run(name.trim());
+      return { id: res.lastInsertRowid, name: name.trim() };
+    } catch (err: any) {
+      throw new Error('Modèle moto déjà existant: ' + err.message);
+    }
+  });
+
+  ipcMain.handle('delete-motorcycle-model', (_event, id: number) => {
+    db.prepare('DELETE FROM motorcycle_models WHERE id = ?').run(id);
+    return { success: true };
+  });
+
   // Update product photo
   ipcMain.handle('update-product-photo', (_event, payload: { productId: number; photoBase64: string }) => {
     db.prepare('UPDATE products SET photo_base64 = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(payload.photoBase64, payload.productId);

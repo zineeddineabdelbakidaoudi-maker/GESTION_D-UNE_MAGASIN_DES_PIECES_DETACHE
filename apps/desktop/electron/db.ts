@@ -369,6 +369,9 @@ function initLocalSchema(db: Database.Database) {
   try { db.exec(`ALTER TABLE settings ADD COLUMN avg_price_mode INTEGER NOT NULL DEFAULT 1`); } catch {}
   try { db.exec(`ALTER TABLE products ADD COLUMN photo_base64 TEXT DEFAULT NULL`); } catch {}
   try { db.exec(`CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL)`); } catch {}
+
+  // Ensure rich realistic products are available for testing
+  seedRealProductsIfMissing(db);
 }
 
 function seedLocalData(db: Database.Database) {
@@ -416,17 +419,25 @@ function seedLocalData(db: Database.Database) {
   brandsList.forEach((b, idx) => insertBrand.run(idx + 1, b));
 
   const sampleProducts = [
-    { id: 1, name: 'Plaquettes de Frein Avant Céramique', cat: 2, brand: 3, pAchat: 120000, pDet: 220000, pSemi: 190000, pGros: 170000, colorMode: 'single', colorId: 10, stock1: 25, stock2: 15, motos: [1, 2, 3] },
-    { id: 2, name: 'Kit Chaîne Renforcé O-Ring 428-130L', cat: 5, brand: 1, pAchat: 350000, pDet: 550000, pSemi: 480000, pGros: 420000, colorMode: 'single', colorId: 77, stock1: 18, stock2: 12, motos: [1, 2, 4] },
-    { id: 3, name: 'Casque Intégral Bicolore Sport GT', cat: 4, brand: 8, pAchat: 650000, pDet: 1100000, pSemi: 950000, pGros: 850000, colorMode: 'merged', colorIds: [1, 21], stock1: 8, stock2: 6, motos: [36] },
-    { id: 4, name: 'Cylindre Piston Complet 150cc CG', cat: 1, brand: 9, pAchat: 420000, pDet: 680000, pSemi: 590000, pGros: 520000, colorMode: 'single', colorId: 10, stock1: 14, stock2: 10, motos: [1, 2, 8, 9] },
-    { id: 5, name: 'Feu Arrière LED Fumée + Clignotants Intégrés', cat: 3, brand: 10, pAchat: 180000, pDet: 320000, pSemi: 280000, pGros: 240000, colorMode: 'variants', colorIds: [21, 35, 1], stock1: 30, stock2: 20, motos: [1, 3, 10] },
-    { id: 6, name: 'Huile Moteur Synthèse 10W40 4T (1L)', cat: 8, brand: 5, pAchat: 95000, pDet: 160000, pSemi: 140000, pGros: 125000, colorMode: 'single', colorId: 78, stock1: 50, stock2: 40, motos: [36] },
-    { id: 7, name: 'Pneu Arrière Tubeless 130/70-12', cat: 6, brand: 6, pAchat: 380000, pDet: 580000, pSemi: 520000, pGros: 460000, colorMode: 'single', colorId: 1, stock1: 12, stock2: 8, motos: [10, 11, 12, 13] },
-    { id: 8, name: 'Bougie d\'Allumage Iridium CR8EIX', cat: 1, brand: 4, pAchat: 75000, pDet: 140000, pSemi: 120000, pGros: 105000, colorMode: 'single', colorId: 12, stock1: 45, stock2: 30, motos: [1, 2, 3, 4, 10] }
+    { id: 1, name: 'BOUGIE D\'ALLUMAGE IRIDIUM NGK CR8EIX', cat: 1, brand: 4, pAchat: 75000, pDet: 140000, pSemi: 120000, pGros: 105000, colorMode: 'single', colorId: null, location: 'A-01', stock1: 45, stock2: 30, motos: [1, 2, 3, 4, 10] },
+    { id: 2, name: 'KIT CHAINE RENFORCE O-RING 428-130L DID', cat: 5, brand: 1, pAchat: 350000, pDet: 550000, pSemi: 480000, pGros: 420000, colorMode: 'single', colorId: null, location: 'B-03', stock1: 18, stock2: 12, motos: [1, 2, 4] },
+    { id: 3, name: 'PLAQUETTES DE FREIN AVANT CERAMIQUE BREMBO', cat: 2, brand: 3, pAchat: 120000, pDet: 220000, pSemi: 190000, pGros: 170000, colorMode: 'single', colorId: null, location: 'A-05', stock1: 25, stock2: 15, motos: [1, 2, 3] },
+    { id: 4, name: 'CYLINDRE PISTON COMPLET 150CC CG125', cat: 1, brand: 9, pAchat: 420000, pDet: 680000, pSemi: 590000, pGros: 520000, colorMode: 'single', colorId: null, location: 'C-02', stock1: 14, stock2: 10, motos: [1, 2, 8, 9] },
+    { id: 5, name: 'HUILE MOTEUR SYNTHESE MOTUL 7100 10W40 (1L)', cat: 8, brand: 5, pAchat: 95000, pDet: 160000, pSemi: 140000, pGros: 125000, colorMode: 'single', colorId: null, location: 'D-01', stock1: 50, stock2: 40, motos: [36] },
+    { id: 6, name: 'PNEU ARRIERE TUBELESS 130/70-12 KENDA', cat: 6, brand: 6, pAchat: 380000, pDet: 580000, pSemi: 520000, pGros: 460000, colorMode: 'single', colorId: null, location: 'P-04', stock1: 12, stock2: 8, motos: [10, 11, 12, 13] },
+    { id: 7, name: 'CARENAGE FACE AVANT NOIR BRILLANT VMS CUXI', cat: 7, brand: 8, pAchat: 280000, pDet: 450000, pSemi: 390000, pGros: 350000, colorMode: 'single', colorId: 1, location: 'CR-01', stock1: 8, stock2: 5, motos: [10] },
+    { id: 8, name: 'CARENAGE LATERAL BLANC SYM SYMPHONY ST', cat: 7, brand: 2, pAchat: 320000, pDet: 520000, pSemi: 460000, pGros: 410000, colorMode: 'single', colorId: 2, location: 'CR-02', stock1: 6, stock2: 4, motos: [11] },
+    { id: 9, name: 'RETROVISEURS UNIVERSELS CARBONE CNC (PAIRE)', cat: 7, brand: 10, pAchat: 150000, pDet: 260000, pSemi: 220000, pGros: 190000, colorMode: 'single', colorId: 1, location: 'AC-03', stock1: 15, stock2: 10, motos: [36] },
+    { id: 10, name: 'FILTRE A AIR RACING MOUSSE FOX / 103', cat: 1, brand: 10, pAchat: 45000, pDet: 85000, pSemi: 70000, pGros: 60000, colorMode: 'single', colorId: null, location: 'A-08', stock1: 30, stock2: 20, motos: [14, 15] },
+    { id: 11, name: 'DEMARREUR ELECTRIQUE RENFORCE CG125/150', cat: 1, brand: 9, pAchat: 290000, pDet: 460000, pSemi: 400000, pGros: 360000, colorMode: 'single', colorId: null, location: 'C-05', stock1: 10, stock2: 6, motos: [1, 2] },
+    { id: 12, name: 'AMORTISSEUR ARRIERE REGLABLE GAZ 320MM', cat: 7, brand: 8, pAchat: 480000, pDet: 750000, pSemi: 660000, pGros: 590000, colorMode: 'single', colorId: 21, location: 'S-02', stock1: 8, stock2: 5, motos: [1, 2, 10] },
+    { id: 13, name: 'DISQUE DE FREIN AVANT WAVE 260MM', cat: 2, brand: 3, pAchat: 260000, pDet: 420000, pSemi: 360000, pGros: 320000, colorMode: 'single', colorId: null, location: 'A-06', stock1: 12, stock2: 8, motos: [10, 11] },
+    { id: 14, name: 'CASQUE INTEGRAL SPORT NOIR MAT TAILLE L', cat: 4, brand: 8, pAchat: 650000, pDet: 1100000, pSemi: 950000, pGros: 850000, colorMode: 'single', colorId: 1, location: 'CS-01', stock1: 7, stock2: 4, motos: [36] },
+    { id: 15, name: 'COURROIE TRANSMISSION RENFORCEE BANDO', cat: 5, brand: 2, pAchat: 180000, pDet: 310000, pSemi: 270000, pGros: 240000, colorMode: 'single', colorId: null, location: 'B-01', stock1: 20, stock2: 15, motos: [10, 11] },
+    { id: 16, name: 'CABLE ACCELERATEUR + GAINE TEFLON CG125', cat: 1, brand: 9, pAchat: 35000, pDet: 70000, pSemi: 55000, pGros: 45000, colorMode: 'single', colorId: null, location: 'CB-02', stock1: 40, stock2: 25, motos: [1, 2] }
   ];
 
-  const insertProd = db.prepare('INSERT INTO products (id, code, name, category_id, brand_id, price_achat, price_detail, price_semi_gros, price_gros, color_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  const insertProd = db.prepare('INSERT INTO products (id, code, name, category_id, brand_id, price_achat, price_detail, price_semi_gros, price_gros, color_mode, location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
   const insertBarcode = db.prepare('INSERT INTO product_barcodes (product_id, barcode_value, source) VALUES (?, ?, ?)');
   const insertProdColor = db.prepare('INSERT INTO product_colors (product_id, color_id, merge_group_id) VALUES (?, ?, ?)');
   const insertCompat = db.prepare('INSERT INTO product_motorcycle_compat (product_id, motorcycle_model_id) VALUES (?, ?)');
@@ -434,15 +445,11 @@ function seedLocalData(db: Database.Database) {
   const insertMovement = db.prepare('INSERT INTO stock_movements (product_id, store_id, movement_code, qty_before, qty_after, delta, user_id, ref_type, ref_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
 
   for (const p of sampleProducts) {
-    insertProd.run(p.id, formatProductCode(p.id), p.name, p.cat, p.brand, p.pAchat, p.pDet, p.pSemi, p.pGros, p.colorMode);
+    insertProd.run(p.id, formatProductCode(p.id), p.name, p.cat, p.brand, p.pAchat, p.pDet, p.pSemi, p.pGros, p.colorMode, p.location || '');
     insertBarcode.run(p.id, generateBarcodeValue(p.id), 'auto');
 
-    if (p.colorMode === 'single' && p.colorId) {
+    if (p.colorId) {
       insertProdColor.run(p.id, p.colorId, null);
-    } else if (p.colorMode === 'merged' && p.colorIds) {
-      for (const cid of p.colorIds) insertProdColor.run(p.id, cid, `merge-${p.id}`);
-    } else if (p.colorMode === 'variants' && p.colorIds) {
-      for (const cid of p.colorIds) insertProdColor.run(p.id, cid, null);
     }
 
     for (const mid of p.motos) insertCompat.run(p.id, mid);
@@ -521,5 +528,51 @@ function seedLocalData(db: Database.Database) {
   const installDateRow = db.prepare('SELECT value FROM app_config WHERE key = ?').get('first_install_date') as any;
   if (!installDateRow) {
     db.prepare('INSERT INTO app_config (key, value) VALUES (?, ?)').run('first_install_date', Date.now().toString());
+  }
+}
+
+function seedRealProductsIfMissing(db: Database.Database) {
+  try {
+    const prodCount = db.prepare('SELECT COUNT(*) as cnt FROM products').get() as any;
+    if (prodCount && prodCount.cnt >= 12) return; // already populated with real products
+
+    const realProducts = [
+      { id: 1, name: 'BOUGIE D\'ALLUMAGE IRIDIUM NGK CR8EIX', cat: 1, brand: 4, pAchat: 75000, pDet: 140000, pSemi: 120000, pGros: 105000, colorMode: 'single', location: 'A-01', stock1: 45 },
+      { id: 2, name: 'KIT CHAINE RENFORCE O-RING 428-130L DID', cat: 5, brand: 1, pAchat: 350000, pDet: 550000, pSemi: 480000, pGros: 420000, colorMode: 'single', location: 'B-03', stock1: 18 },
+      { id: 3, name: 'PLAQUETTES DE FREIN AVANT CERAMIQUE BREMBO', cat: 2, brand: 3, pAchat: 120000, pDet: 220000, pSemi: 190000, pGros: 170000, colorMode: 'single', location: 'A-05', stock1: 25 },
+      { id: 4, name: 'CYLINDRE PISTON COMPLET 150CC CG125', cat: 1, brand: 9, pAchat: 420000, pDet: 680000, pSemi: 590000, pGros: 520000, colorMode: 'single', location: 'C-02', stock1: 14 },
+      { id: 5, name: 'HUILE MOTEUR SYNTHESE MOTUL 7100 10W40 (1L)', cat: 8, brand: 5, pAchat: 95000, pDet: 160000, pSemi: 140000, pGros: 125000, colorMode: 'single', location: 'D-01', stock1: 50 },
+      { id: 6, name: 'PNEU ARRIERE TUBELESS 130/70-12 KENDA', cat: 6, brand: 6, pAchat: 380000, pDet: 580000, pSemi: 520000, pGros: 460000, colorMode: 'single', location: 'P-04', stock1: 12 },
+      { id: 7, name: 'CARENAGE FACE AVANT NOIR BRILLANT VMS CUXI', cat: 7, brand: 8, pAchat: 280000, pDet: 450000, pSemi: 390000, pGros: 350000, colorMode: 'single', location: 'CR-01', stock1: 8 },
+      { id: 8, name: 'CARENAGE LATERAL BLANC SYM SYMPHONY ST', cat: 7, brand: 2, pAchat: 320000, pDet: 520000, pSemi: 460000, pGros: 410000, colorMode: 'single', location: 'CR-02', stock1: 6 },
+      { id: 9, name: 'RETROVISEURS UNIVERSELS CARBONE CNC (PAIRE)', cat: 7, brand: 10, pAchat: 150000, pDet: 260000, pSemi: 220000, pGros: 190000, colorMode: 'single', location: 'AC-03', stock1: 15 },
+      { id: 10, name: 'FILTRE A AIR RACING MOUSSE FOX / 103', cat: 1, brand: 10, pAchat: 45000, pDet: 85000, pSemi: 70000, pGros: 60000, colorMode: 'single', location: 'A-08', stock1: 30 },
+      { id: 11, name: 'DEMARREUR ELECTRIQUE RENFORCE CG125/150', cat: 1, brand: 9, pAchat: 290000, pDet: 460000, pSemi: 400000, pGros: 360000, colorMode: 'single', location: 'C-05', stock1: 10 },
+      { id: 12, name: 'AMORTISSEUR ARRIERE REGLABLE GAZ 320MM', cat: 7, brand: 8, pAchat: 480000, pDet: 750000, pSemi: 660000, pGros: 590000, colorMode: 'single', location: 'S-02', stock1: 8 },
+      { id: 13, name: 'DISQUE DE FREIN AVANT WAVE 260MM', cat: 2, brand: 3, pAchat: 260000, pDet: 420000, pSemi: 360000, pGros: 320000, colorMode: 'single', location: 'A-06', stock1: 12 },
+      { id: 14, name: 'CASQUE INTEGRAL SPORT NOIR MAT TAILLE L', cat: 4, brand: 8, pAchat: 650000, pDet: 1100000, pSemi: 950000, pGros: 850000, colorMode: 'single', location: 'CS-01', stock1: 7 },
+      { id: 15, name: 'COURROIE TRANSMISSION RENFORCEE BANDO', cat: 5, brand: 2, pAchat: 180000, pDet: 310000, pSemi: 270000, pGros: 240000, colorMode: 'single', location: 'B-01', stock1: 20 },
+      { id: 16, name: 'CABLE ACCELERATEUR + GAINE TEFLON CG125', cat: 1, brand: 9, pAchat: 35000, pDet: 70000, pSemi: 55000, pGros: 45000, colorMode: 'single', location: 'CB-02', stock1: 40 }
+    ];
+
+    const insertProd = db.prepare(`
+      INSERT INTO products (id, code, name, category_id, brand_id, price_achat, price_detail, price_semi_gros, price_gros, color_mode, location)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        price_achat = excluded.price_achat,
+        price_detail = excluded.price_detail,
+        location = excluded.location
+    `);
+    const insertBarcode = db.prepare('INSERT OR IGNORE INTO product_barcodes (product_id, barcode_value, source) VALUES (?, ?, ?)');
+    const insertStock = db.prepare('INSERT INTO product_stock (product_id, store_id, quantity) VALUES (?, ?, ?) ON CONFLICT(product_id, store_id) DO UPDATE SET quantity = excluded.quantity');
+
+    for (const p of realProducts) {
+      insertProd.run(p.id, formatProductCode(p.id), p.name, p.cat, p.brand, p.pAchat, p.pDet, p.pSemi, p.pGros, p.colorMode, p.location);
+      insertBarcode.run(p.id, generateBarcodeValue(p.id), 'auto');
+      insertStock.run(p.id, 1, p.stock1);
+    }
+  } catch (err) {
+    console.error('Error seeding real products:', err);
   }
 }

@@ -297,6 +297,7 @@ export const POSPage: React.FC = () => {
               <Search className="w-5 h-5 text-slate-500 absolute left-3.5 top-3" />
               <input
                 ref={searchInputRef}
+                autoFocus
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
