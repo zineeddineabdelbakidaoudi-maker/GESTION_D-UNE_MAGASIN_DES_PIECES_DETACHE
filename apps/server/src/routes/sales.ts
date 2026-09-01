@@ -42,6 +42,35 @@ router.get('/', authenticateToken, requirePermission('pos', 'view'), (req: AuthR
   res.json(result);
 });
 
+// GET /api/sales/:id (Get specific sale with all items)
+router.get('/:id', authenticateToken, (req: AuthRequest, res: Response) => {
+  const saleId = parseInt(String(req.params.id), 10);
+  const { rawDb, isPg } = getDb();
+  if (isPg) return res.status(404).json({ error: 'Non supporté' });
+
+  const sale = rawDb.prepare(`
+    SELECT s.*, c.name as client_name, u.full_name as cashier_name, st.name as store_name
+    FROM sales s
+    LEFT JOIN clients c ON s.client_id = c.id
+    LEFT JOIN users u ON s.user_id = u.id
+    LEFT JOIN stores st ON s.store_id = st.id
+    WHERE s.id = ?
+  `).get(saleId) as any;
+
+  if (!sale) {
+    return res.status(404).json({ error: 'Vente non trouvée' });
+  }
+
+  const items = rawDb.prepare(`
+    SELECT si.*, p.code as product_code, p.name as product_name
+    FROM sale_items si
+    JOIN products p ON si.product_id = p.id
+    WHERE si.sale_id = ?
+  `).all(saleId);
+
+  res.json({ ...sale, items });
+});
+
 // POST /api/sales (POS Checkout with Credit & Cash options)
 router.post('/', authenticateToken, requirePermission('pos', 'edit'), (req: AuthRequest, res: Response) => {
   const parsed = createSaleSchema.safeParse(req.body);

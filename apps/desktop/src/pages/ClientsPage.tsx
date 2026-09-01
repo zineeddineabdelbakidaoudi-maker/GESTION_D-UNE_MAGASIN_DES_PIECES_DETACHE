@@ -26,6 +26,10 @@ export const ClientsPage: React.FC = () => {
   const [versementAmount, setVersementAmount] = useState('');
   const [versementNote, setVersementNote] = useState('');
 
+  const [showDossierModal, setShowDossierModal] = useState(false);
+  const [clientSales, setClientSales] = useState<any[]>([]);
+  const [dossierTab, setDossierTab] = useState<'all' | 'sales' | 'versements'>('all');
+
   const loadClients = async () => {
     try {
       const res = await invokeIpc<Client[]>('get-clients');
@@ -43,11 +47,17 @@ export const ClientsPage: React.FC = () => {
     loadClients();
   }, []);
 
-  const handleSelectClient = async (client: Client) => {
+  const handleSelectClient = async (client: Client, openDossier = false) => {
     setSelectedClient(client);
     try {
-      const txs = await invokeIpc<any[]>('get-client-transactions', client.id);
+      const [txs, allSales] = await Promise.all([
+        invokeIpc<any[]>('get-client-transactions', client.id),
+        invokeIpc<any[]>('get-sales', { storeId: 1, limit: 200 })
+      ]);
       setTransactions(txs || []);
+      const matchedSales = (allSales || []).filter((s: any) => s.clientId === client.id || s.client_id === client.id);
+      setClientSales(matchedSales);
+      if (openDossier) setShowDossierModal(true);
     } catch (err) {
       console.error(err);
     }
@@ -155,10 +165,12 @@ export const ClientsPage: React.FC = () => {
                   return (
                     <tr
                       key={c.id}
-                      onClick={() => handleSelectClient(c)}
+                      onClick={() => handleSelectClient(c, false)}
+                      onDoubleClick={() => handleSelectClient(c, true)}
                       className={`hover:bg-slate-800/50 cursor-pointer transition-colors ${
                         isSelected ? 'bg-blue-600/10 border-l-4 border-l-blue-500' : ''
                       }`}
+                      title={isAr ? 'انقر مرتين لفتح الملف الكامل' : 'Double-cliquez pour ouvrir la fiche complète'}
                     >
                       <td className="px-4 py-3">
                         <div className="font-bold text-white flex items-center gap-1.5">
@@ -187,16 +199,28 @@ export const ClientsPage: React.FC = () => {
                         )}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={e => {
-                            e.stopPropagation();
-                            handleSelectClient(c);
-                            setShowVersementModal(true);
-                          }}
-                          className="px-2.5 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-bold"
-                        >
-                          + {isAr ? 'دفعة' : 'Versement'}
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              handleSelectClient(c, true);
+                            }}
+                            className="px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-lg text-[11px] font-bold"
+                            title={isAr ? 'الملف الكامل' : 'Fiche Complète'}
+                          >
+                            {isAr ? 'الملف' : 'Fiche'}
+                          </button>
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              handleSelectClient(c);
+                              setShowVersementModal(true);
+                            }}
+                            className="px-2.5 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-bold"
+                          >
+                            + {isAr ? 'دفعة' : 'Versement'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -222,12 +246,20 @@ export const ClientsPage: React.FC = () => {
                   </p>
                 </div>
 
-                <button
-                  onClick={() => setShowVersementModal(true)}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shadow-md shadow-emerald-600/20"
-                >
-                  + {isAr ? 'تسجيل دفعة' : 'Versement'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowDossierModal(true)}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs shadow-md shadow-blue-600/20"
+                  >
+                    {isAr ? 'الملف الكامل' : 'Dossier'}
+                  </button>
+                  <button
+                    onClick={() => setShowVersementModal(true)}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shadow-md shadow-emerald-600/20"
+                  >
+                    + {isAr ? 'دفعة' : 'Versement'}
+                  </button>
+                </div>
               </div>
 
               {/* Debt Card */}
@@ -248,106 +280,351 @@ export const ClientsPage: React.FC = () => {
                 </h4>
 
                 <div className="max-h-64 overflow-y-auto divide-y divide-slate-800 border border-slate-800 rounded-xl p-2 bg-slate-950 text-xs">
-                  {transactions.map(tx => (
-                    <div key={tx.id} className="py-2 px-1 flex items-center justify-between">
-                      <div>
-                        <div className="font-semibold text-white">
-                          {tx.type === 'achat' ? (isAr ? 'شراء بالآجل' : 'Achat à Crédit') : (isAr ? 'دفعة مسددة' : 'Versement')}
+                  {transactions.length === 0 ? (
+                    <div className="p-4 text-center text-slate-500 text-xs">
+                      {isAr ? 'لا توجد عمليات مسجلة' : 'Aucune opération enregistrée'}
+                    </div>
+                  ) : (
+                    transactions.map((tx: any) => (
+                      <div key={tx.id} className="p-2 flex items-center justify-between hover:bg-slate-900/50 rounded-lg">
+                        <div>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            tx.type === 'versement' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                          }`}>
+                            {tx.type}
+                          </span>
+                          <span className="text-slate-400 text-[11px] ml-2">
+                            {new Date(tx.createdAt || tx.created_at).toLocaleDateString('fr-DZ')}
+                          </span>
+                          {tx.note && <div className="text-[10px] text-slate-400 mt-0.5">{tx.note}</div>}
                         </div>
-                        <div className="text-[10px] text-slate-500 font-mono">
-                          {new Date(tx.created_at || tx.createdAt).toLocaleDateString('fr-DZ')} {tx.note && `• ${tx.note}`}
+                        <div className={`font-mono font-bold ${
+                          tx.type === 'versement' ? 'text-emerald-400' : 'text-rose-400'
+                        }`}>
+                          {tx.type === 'versement' ? '-' : '+'}{formatDZD(tx.amount)}
                         </div>
                       </div>
-                      <span className={`font-mono font-bold ${
-                        tx.type === 'achat' ? 'text-rose-400' : 'text-emerald-400'
-                      }`}>
-                        {tx.type === 'achat' ? `+${formatDZD(tx.amount)}` : `-${formatDZD(tx.amount)}`}
-                      </span>
-                    </div>
-                  ))}
-                  {transactions.length === 0 && (
-                    <p className="text-xs text-slate-500 italic text-center py-4">{isAr ? 'لا توجد حركات مسجلة' : 'Aucune opération enregistrée'}</p>
+                    ))
                   )}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 text-center text-slate-500 text-xs font-medium">
-              {isAr ? 'اختر زبوناً من القائمة لعرض تفاصيل حسابه' : 'Sélectionnez un client dans la liste pour afficher ses détails et son historique de paiement.'}
+            <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 text-center text-slate-500 text-xs">
+              {isAr ? 'اختر زبوناً أو انقر مرتين لعرض التفاصيل' : 'Sélectionnez un client ou double-cliquez pour afficher son dossier'}
             </div>
           )}
         </div>
       </div>
 
-      {/* Modal: New Client */}
+      {/* Complete Dossier Modal */}
+      {showDossierModal && selectedClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-800 bg-slate-800/40 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-xl">
+                  {selectedClient.name.slice(0, 1).toUpperCase()}
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-white flex items-center gap-2">
+                    <span>{selectedClient.name}</span>
+                    {selectedClient.isFidele && <span className="text-amber-400 text-sm">⭐ Client Fidèle</span>}
+                  </h2>
+                  <p className="text-xs text-slate-400 flex items-center gap-3 mt-1">
+                    <span>📞 {selectedClient.phone || 'Sans téléphone'}</span>
+                    <span>📍 {selectedClient.address || 'Sans adresse'}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowVersementModal(true)}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md transition-all"
+                >
+                  + {isAr ? 'تسجيل دفعة' : 'Nouveau Versement'}
+                </button>
+                <button
+                  onClick={() => setShowDossierModal(false)}
+                  className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* KPI Summary Strip */}
+            <div className="p-6 grid grid-cols-3 gap-4 bg-slate-950/50 border-b border-slate-800">
+              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
+                <p className="text-[10px] font-bold uppercase text-slate-400">Total Achats (CA)</p>
+                <p className="text-lg font-black font-mono text-blue-400 mt-0.5">
+                  {formatDZD(
+                    transactions
+                      .filter((t: any) => t.type === 'achat')
+                      .reduce((sum: number, t: any) => sum + t.amount, 0)
+                  )}
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
+                <p className="text-[10px] font-bold uppercase text-slate-400">Total Versements Réglés</p>
+                <p className="text-lg font-black font-mono text-emerald-400 mt-0.5">
+                  {formatDZD(
+                    transactions
+                      .filter((t: any) => t.type === 'versement')
+                      .reduce((sum: number, t: any) => sum + t.amount, 0)
+                  )}
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800">
+                <p className="text-[10px] font-bold uppercase text-slate-400">Solde / Reste Dû (Dette)</p>
+                <p className={`text-lg font-black font-mono mt-0.5 ${(selectedClient.currentDebt || 0) > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  {formatDZD(selectedClient.currentDebt || 0)}
+                </p>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="px-6 pt-4 flex items-center gap-2 border-b border-slate-800 bg-slate-900">
+              <button
+                onClick={() => setDossierTab('all')}
+                className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
+                  dossierTab === 'all'
+                    ? 'border-blue-500 text-blue-400'
+                    : 'border-transparent text-slate-400 hover:text-white'
+                }`}
+              >
+                {isAr ? 'سجل العمليات الكامل (Grand Livre)' : 'Journal Complet (Grand Livre)'}
+              </button>
+              <button
+                onClick={() => setDossierTab('sales')}
+                className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
+                  dossierTab === 'sales'
+                    ? 'border-blue-500 text-blue-400'
+                    : 'border-transparent text-slate-400 hover:text-white'
+                }`}
+              >
+                {isAr ? 'تفاصيل فواتير الشراء' : 'Bons de Vente / Factures'}
+              </button>
+              <button
+                onClick={() => setDossierTab('versements')}
+                className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
+                  dossierTab === 'versements'
+                    ? 'border-blue-500 text-blue-400'
+                    : 'border-transparent text-slate-400 hover:text-white'
+                }`}
+              >
+                {isAr ? 'سجل الدفعات' : 'Versements & Règlements'}
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="p-6 flex-1 overflow-y-auto space-y-4">
+              {dossierTab === 'all' && (
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-800 text-slate-400 uppercase font-bold border-b border-slate-700">
+                    <tr>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Type</th>
+                      <th className="px-4 py-3">Réf / Note</th>
+                      <th className="px-4 py-3 text-right">Débit (+)</th>
+                      <th className="px-4 py-3 text-right">Crédit (-)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 font-mono">
+                    {transactions.length === 0 ? (
+                      <tr><td colSpan={5} className="py-8 text-center text-slate-500">Aucun historique</td></tr>
+                    ) : (
+                      transactions.map((tx: any) => (
+                        <tr key={tx.id} className="hover:bg-slate-800/40">
+                          <td className="px-4 py-3 text-slate-300">{new Date(tx.createdAt || tx.created_at).toLocaleString('fr-DZ')}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              tx.type === 'versement' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                            }`}>
+                              {tx.type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-sans text-slate-300">{tx.note || (tx.sale_id ? `Vente #${tx.sale_id}` : '—')}</td>
+                          <td className="px-4 py-3 text-right text-rose-400 font-bold">
+                            {tx.type === 'achat' ? formatDZD(tx.amount) : '—'}
+                          </td>
+                          <td className="px-4 py-3 text-right text-emerald-400 font-bold">
+                            {tx.type === 'versement' ? formatDZD(tx.amount) : '—'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              )}
+
+              {dossierTab === 'sales' && (
+                <div className="space-y-4">
+                  {clientSales.length === 0 ? (
+                    <div className="py-8 text-center text-slate-500 text-xs">
+                      {isAr ? 'لا توجد فواتير بيع مسجلة لهذا الزبون' : 'Aucun ticket de caisse enregistré pour ce client'}
+                    </div>
+                  ) : (
+                    clientSales.map((s: any) => (
+                      <div key={s.id} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                        <div className="flex items-center justify-between text-xs border-b border-slate-800 pb-2">
+                          <div className="font-bold text-white">
+                            Ticket #{s.id} • <span className="text-slate-400 font-mono">{new Date(s.createdAt || s.created_at).toLocaleString('fr-DZ')}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono font-bold text-blue-400">Total: {formatDZD(s.total)}</span>
+                            <span className="font-mono font-bold text-emerald-400">Payé: {formatDZD(s.amountPaid || s.amount_paid || s.total)}</span>
+                            {(s.amountCredit || s.amount_credit || 0) > 0 && (
+                              <span className="font-mono font-bold text-rose-400">Crédit: {formatDZD(s.amountCredit || s.amount_credit)}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {s.items && s.items.length > 0 ? (
+                          <table className="w-full text-[11px] text-left">
+                            <thead className="text-slate-400 font-bold">
+                              <tr>
+                                <th className="pb-1">Article</th>
+                                <th className="pb-1 text-center">Quantité</th>
+                                <th className="pb-1 text-right">Prix Unitaire</th>
+                                <th className="pb-1 text-right">Total Ligne</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800 font-mono">
+                              {s.items.map((it: any, idx: number) => (
+                                <tr key={idx}>
+                                  <td className="py-1 font-sans text-slate-200">{it.productName || it.product_name || `Article #${it.productId || it.product_id}`}</td>
+                                  <td className="py-1 text-center">{it.qty}</td>
+                                  <td className="py-1 text-right">{formatDZD(it.unitPrice || it.unit_price)}</td>
+                                  <td className="py-1 text-right text-emerald-400">{formatDZD(it.lineTotal || it.line_total)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <div className="text-[11px] text-slate-500">Détails articles non synchronisés</div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {dossierTab === 'versements' && (
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-800 text-slate-400 uppercase font-bold border-b border-slate-700">
+                    <tr>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Montant Versé</th>
+                      <th className="px-4 py-3">Note / Réf</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 font-mono">
+                    {transactions.filter((t: any) => t.type === 'versement').length === 0 ? (
+                      <tr><td colSpan={3} className="py-8 text-center text-slate-500">Aucun versement enregistré</td></tr>
+                    ) : (
+                      transactions.filter((t: any) => t.type === 'versement').map((tx: any) => (
+                        <tr key={tx.id} className="hover:bg-slate-800/40">
+                          <td className="px-4 py-3 text-slate-300">{new Date(tx.createdAt || tx.created_at).toLocaleString('fr-DZ')}</td>
+                          <td className="px-4 py-3 text-emerald-400 font-bold">{formatDZD(tx.amount)}</td>
+                          <td className="px-4 py-3 font-sans text-slate-300">{tx.note || 'Règlement'}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-800 bg-slate-950 flex justify-end">
+              <button
+                onClick={() => setShowDossierModal(false)}
+                className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition-colors"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Client Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 text-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-base font-black text-white flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-blue-400" />
-                <span>{isAr ? 'إضافة زبون جديد' : 'Nouveau Client'}</span>
+              <h3 className="font-bold text-white text-base">
+                {isAr ? 'إضافة زبون جديد' : 'Nouveau Client'}
               </h3>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateClient} className="space-y-4">
+            <form onSubmit={handleCreateClient} className="space-y-4 text-xs">
               <div>
-                <label className="text-[11px] font-semibold text-slate-300">{isAr ? 'اسم الزبون *' : 'Nom Complet du Client *'}</label>
+                <label className="text-slate-300 font-semibold">{isAr ? 'الاسم واللقب *' : 'Nom Complet *'}</label>
                 <input
                   type="text"
                   required
-                  placeholder={isAr ? 'مثال: أحمد بلقاسم' : 'Ex: Ahmed Belkacem'}
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none"
+                  placeholder={isAr ? 'اسم الزبون' : 'Ex: Ahmed Benali'}
+                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300">{isAr ? 'رقم الهاتف' : 'Numéro de Téléphone'}</label>
+                <label className="text-slate-300 font-semibold">{isAr ? 'رقم الهاتف' : 'Téléphone'}</label>
                 <input
                   type="text"
-                  placeholder="0550 00 00 00"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white outline-none"
+                  placeholder="05 / 06 / 07..."
+                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300">{isAr ? 'العنوان' : 'Adresse / Ville'}</label>
+                <label className="text-slate-300 font-semibold">{isAr ? 'العنوان' : 'Adresse'}</label>
                 <input
                   type="text"
-                  placeholder={isAr ? 'الجزائر العاصمة' : 'Alger'}
                   value={address}
                   onChange={e => setAddress(e.target.value)}
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                  placeholder={isAr ? 'المدينة / الحي' : 'Ex: Bab Ezzouar, Alger'}
+                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none"
                 />
               </div>
 
-              <label className="flex items-center gap-2 text-xs text-slate-300 font-semibold cursor-pointer pt-1">
+              <div className="flex items-center gap-2 pt-2">
                 <input
                   type="checkbox"
+                  id="isFidele"
                   checked={isFidele}
                   onChange={e => setIsFidele(e.target.checked)}
+                  className="rounded border-slate-700 bg-slate-800 text-blue-600 focus:ring-0"
                 />
-                <span>{isAr ? 'تعيين كزبون وفي (Client Fidèle ⭐)' : 'Marquer comme Client Fidèle (⭐)'}</span>
-              </label>
+                <label htmlFor="isFidele" className="text-slate-300 font-semibold cursor-pointer">
+                  {isAr ? 'زبون وفي (Fidèle - يستفيد من تخفيضات)' : 'Client Fidèle (Bénéficie de remises)'}
+                </label>
+              </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white rounded-xl"
+                  className="px-4 py-2 text-slate-400 hover:text-white rounded-xl"
                 >
                   {isAr ? 'إلغاء' : 'Annuler'}
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs shadow-md shadow-blue-600/30"
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-md shadow-blue-600/30"
                 >
                   {isAr ? 'حفظ الزبون' : 'Enregistrer'}
                 </button>
@@ -357,14 +634,13 @@ export const ClientsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Modal: Versement */}
+      {/* Versement Modal */}
       {showVersementModal && selectedClient && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 text-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-base font-black text-white flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-emerald-400" />
-                <span>{isAr ? 'تسجيل دفعة زبون' : 'Enregistrer un Versement Client'}</span>
+              <h3 className="font-bold text-white text-base">
+                {isAr ? 'تسجيل دفعة زبون (تسديد دين)' : 'Nouveau Versement Client'}
               </h3>
               <button onClick={() => setShowVersementModal(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />

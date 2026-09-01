@@ -76,22 +76,22 @@ router.put('/:id/permissions', authenticateToken, requirePermission('users', 'ed
   const { rawDb } = getDb();
 
   try {
-    const upsertPerm = rawDb.prepare(`
+    rawDb.prepare('DELETE FROM permissions WHERE user_id = ?').run(userId);
+
+    const insertPerm = rawDb.prepare(`
       INSERT INTO permissions (user_id, module, can_view, can_edit)
       VALUES (?, ?, ?, ?)
-      ON CONFLICT(user_id, module) DO UPDATE SET
-        can_view = excluded.can_view,
-        can_edit = excluded.can_edit
     `);
 
     for (const p of permissionsList) {
       const canView = p.canView ? 1 : 0;
       const canEdit = p.canEdit ? 1 : 0;
-      upsertPerm.run(userId, String(p.module), canView, canEdit);
+      insertPerm.run(userId, String(p.module), canView, canEdit);
     }
 
     res.json({ success: true, userId, permissions: permissionsList });
   } catch (err: any) {
+    console.error('Permission update error:', err);
     res.status(500).json({ error: 'Erreur lors de la mise à jour des permissions', details: err.message });
   }
 });
