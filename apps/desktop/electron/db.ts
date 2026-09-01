@@ -96,6 +96,7 @@ function initLocalSchema(db: Database.Database) {
       price_gros INTEGER NOT NULL DEFAULT 0,
       color_mode TEXT NOT NULL DEFAULT 'single',
       location TEXT NOT NULL DEFAULT '',
+      photo_base64 TEXT DEFAULT NULL,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -318,6 +319,11 @@ function initLocalSchema(db: Database.Database) {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS app_config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS expense_categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE
@@ -361,6 +367,8 @@ function initLocalSchema(db: Database.Database) {
   // Migrate existing DBs: add new columns if they don't exist
   try { db.exec(`ALTER TABLE products ADD COLUMN location TEXT NOT NULL DEFAULT ''`); } catch {}
   try { db.exec(`ALTER TABLE settings ADD COLUMN avg_price_mode INTEGER NOT NULL DEFAULT 1`); } catch {}
+  try { db.exec(`ALTER TABLE products ADD COLUMN photo_base64 TEXT DEFAULT NULL`); } catch {}
+  try { db.exec(`CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL)`); } catch {}
 }
 
 function seedLocalData(db: Database.Database) {
@@ -507,5 +515,11 @@ function seedLocalData(db: Database.Database) {
       ['toggle_session', 'Control+Shift+S']
     ];
     for (const [action, shortcut] of defaultShortcuts) insertShortcut.run(action, shortcut);
+  }
+
+  // Seed first_install_date for 24h trial
+  const installDateRow = db.prepare('SELECT value FROM app_config WHERE key = ?').get('first_install_date') as any;
+  if (!installDateRow) {
+    db.prepare('INSERT INTO app_config (key, value) VALUES (?, ?)').run('first_install_date', Date.now().toString());
   }
 }

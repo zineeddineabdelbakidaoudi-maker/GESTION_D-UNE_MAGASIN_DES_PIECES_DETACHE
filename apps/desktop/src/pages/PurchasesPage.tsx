@@ -24,6 +24,7 @@ interface PurchaseItemInput {
   productCode: string;
   qty: number;
   unitCost: number; // centimes
+  useAvgPrice?: boolean; // toggle prix moyen pour ce produit
 }
 
 export const PurchasesPage: React.FC = () => {
@@ -94,7 +95,8 @@ export const PurchasesPage: React.FC = () => {
           productName: selectedProduct.name,
           productCode: selectedProduct.code,
           qty,
-          unitCost
+          unitCost,
+          useAvgPrice: true // default: use avg price
         }
       ]);
     }
@@ -102,6 +104,12 @@ export const PurchasesPage: React.FC = () => {
     setSelectedProduct(null);
     setItemQty('1');
     setItemCostDZD('');
+  };
+
+  const toggleAvgPrice = (idx: number) => {
+    const updated = [...items];
+    updated[idx] = { ...updated[idx], useAvgPrice: !updated[idx].useAvgPrice };
+    setItems(updated);
   };
 
   const handleRemoveItem = (index: number) => {
@@ -290,6 +298,9 @@ export const PurchasesPage: React.FC = () => {
                       <th className="px-4 py-2.5 text-center">{isAr ? 'الكمية' : 'Qté'}</th>
                       <th className="px-4 py-2.5 text-right">{isAr ? 'سعر الشراء' : 'Prix Unitaire'}</th>
                       <th className="px-4 py-2.5 text-right">{isAr ? 'المجموع' : 'Total Ligne'}</th>
+                      <th className="px-4 py-2.5 text-center" title="Activer le calcul de Prix Moyen pour ce produit">
+                        <span className="text-[10px] text-blue-400">⌀ Moy.</span>
+                      </th>
                       <th className="px-4 py-2.5 text-center"></th>
                     </tr>
                   </thead>
@@ -301,6 +312,20 @@ export const PurchasesPage: React.FC = () => {
                         <td className="px-4 py-3 text-center font-mono font-bold text-emerald-400">+{it.qty}</td>
                         <td className="px-4 py-3 text-right font-mono text-slate-300">{formatDZD(it.unitCost)}</td>
                         <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">{formatDZD(it.qty * it.unitCost)}</td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => toggleAvgPrice(idx)}
+                            title={it.useAvgPrice ? 'Prix Moyen activé — cliquer pour désactiver' : 'Prix Moyen désactivé — cliquer pour activer'}
+                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-all ${
+                              it.useAvgPrice
+                                ? 'bg-blue-600/20 text-blue-400 border-blue-500/40 hover:bg-blue-600/30'
+                                : 'bg-slate-800 text-slate-500 border-slate-700 hover:bg-slate-700'
+                            }`}
+                          >
+                            {it.useAvgPrice ? '⌀ ON' : '⌀ OFF'}
+                          </button>
+                        </td>
                         <td className="px-4 py-3 text-center">
                           <button
                             onClick={() => handleRemoveItem(idx)}

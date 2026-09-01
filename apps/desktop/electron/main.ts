@@ -46,8 +46,14 @@ app.on('window-all-closed', () => {
 function registerIpcHandlers() {
   const db = getLocalDb();
 
-  // 1. Trial Status
+  // 1. Trial Status — reads first_install_date from DB for persistence across app restarts
   ipcMain.handle('get-trial-status', () => {
+    try {
+      const row = db.prepare('SELECT value FROM app_config WHERE key = ?').get('first_install_date') as any;
+      if (row && row.value) {
+        return calculateTrialState(parseInt(row.value, 10));
+      }
+    } catch {}
     return calculateTrialState(BUILD_TIME);
   });
 
@@ -156,9 +162,14 @@ function registerIpcHandlers() {
 
   // Create Product
   ipcMain.handle('create-product', (_event, payload: any) => {
-    const maxIdRow = db.prepare('SELECT COALESCE(MAX(id), 0) + 1 as nextId FROM products').get() as any;
-    const nextId = maxIdRow.nextId;
-    const code = formatProductCode(nextId);
+    const lastProd = db.prepare('SELECT id FROM products ORDER BY id DESC LIMIT 1').get() as any;
+    const nextId = lastProd ? lastProd.id + 1 : 1;
+    const code = payload.customCode ? payload.customCode.trim().toUpperCase() : formatProductCode(nextId);
+    // Check uniqueness of custom code
+    if (payload.customCode) {
+      const existing = db.prepare('SELECT id FROM products WHERE code = ?').get(code) as any;
+      if (existing) throw new Error(`Code article déjà utilisé: ${code}`);
+    }
 
     const insertProd = db.prepare(`
       INSERT INTO products (id, code, name, category_id, brand_id, price_achat, price_detail, price_semi_gros, price_gros, color_mode, location)
@@ -590,7 +601,26 @@ function registerIpcHandlers() {
 
     const totalCA = sales.reduce((acc, s) => acc + s.total, 0);
     const salesCount = sales.length;
-    const totalBeneficesBrut = Math.max(0, Math.round(totalCA * 0.35));
+
+    // Real margin: sum(unit_price - price_achat) * qty for all sale items in period
+    let realMarginSql = `
+      SELECT COALESCE(SUM((si.unit_price - p.price_achat) * si.qty), 0) as margin
+      FROM sale_items si
+      JOIN products p ON si.product_id = p.id
+      JOIN sales s ON si.sale_id = s.id
+      WHERE ${dateFilter.replace(/created_at/g, 's.created_at')}
+    `;
+    const realMarginParams: any[] = [];
+    if (storeId) { realMarginSql += ' AND s.store_id = ?'; realMarginParams.push(storeId); }
+    const marginRow = db.prepare(realMarginSql).get(...realMarginParams) as any;
+    const totalBeneficesBrut = Math.max(0, marginRow?.margin || 0);
+
+    // Subtract returns from CA
+    let returnsSql = `SELECT COALESCE(SUM(total_refund), 0) as totalReturns FROM returns WHERE ${dateFilter.replace(/created_at/g, 'created_at')}`;
+    const returnsParams: any[] = [];
+    if (storeId) { returnsSql += ' AND store_id = ?'; returnsParams.push(storeId); }
+    const returnsRow = db.prepare(returnsSql).get(...returnsParams) as any;
+    const totalReturns = returnsRow?.totalReturns || 0;
 
     // Calculate total expenses for the period
     let depFilter = dateFilter.replace(/created_at/g, 'depense_date');
@@ -602,7 +632,7 @@ function registerIpcHandlers() {
     }
     const depRow = db.prepare(depSql).get(...depParams) as any;
     const totalDepenses = depRow?.totalDep || 0;
-    const totalBenefices = Math.max(0, totalBeneficesBrut - totalDepenses);
+    const totalBenefices = Math.max(0, totalBeneficesBrut - totalDepenses - totalReturns);
 
     const clientsDebt = db.prepare(`
       SELECT COALESCE(SUM(CASE WHEN type = 'achat' THEN amount WHEN type = 'versement' THEN -amount ELSE 0 END), 0) as debt
@@ -628,10 +658,11 @@ function registerIpcHandlers() {
     `).all();
 
     return {
-      totalCA,
+      totalCA: totalCA - totalReturns,
       totalBeneficesBrut,
       totalDepenses,
       totalBenefices,
+      totalReturns,
       salesCount,
       totalDetteClients: clientsDebt?.debt || 0,
       topProducts,
@@ -838,5 +869,48 @@ ${settings?.receiptFooter || 'Merci pour votre confiance !'}
     } catch {
       return { error: 'Catégorie déjà existante' };
     }
+  });
+
+  // Get all distinct used locations
+  ipcMain.handle('get-locations', () => {
+    return db.prepare(`SELECT DISTINCT location FROM products WHERE location != '' ORDER BY location ASC`).all().map((r: any) => r.location);
+  });
+
+  // Add a new color
+  ipcMain.handle('add-color', (_event, payload: { name: string; hexCode: string }) => {
+    try {
+      const res = db.prepare('INSERT INTO colors (name, hex_code) VALUES (?, ?)').run(payload.name, payload.hexCode || '#888888');
+      return { id: res.lastInsertRowid, name: payload.name, hexCode: payload.hexCode };
+    } catch (err: any) {
+      throw new Error('Couleur déjà existante: ' + err.message);
+    }
+  });
+
+  // Update product photo
+  ipcMain.handle('update-product-photo', (_event, payload: { productId: number; photoBase64: string }) => {
+    db.prepare('UPDATE products SET photo_base64 = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(payload.photoBase64, payload.productId);
+    return { success: true };
+  });
+
+  // Get today dashboard KPIs for POS
+  ipcMain.handle('get-daily-kpi', (_event, storeId?: number) => {
+    const sid = storeId || 1;
+    const caRow = db.prepare(`SELECT COALESCE(SUM(total), 0) as ca FROM sales WHERE date(created_at) = date('now') AND store_id = ?`).get(sid) as any;
+    const returnsRow = db.prepare(`SELECT COALESCE(SUM(total_refund), 0) as ret FROM returns WHERE date(created_at) = date('now') AND store_id = ?`).get(sid) as any;
+    const depensesRow = db.prepare(`SELECT COALESCE(SUM(amount), 0) as dep FROM depenses WHERE date(depense_date) = date('now') AND store_id = ?`).get(sid) as any;
+    const detteRow = db.prepare(`SELECT COALESCE(SUM(CASE WHEN type='achat' THEN amount WHEN type='versement' THEN -amount ELSE 0 END),0) as dette FROM client_transactions`).get() as any;
+    
+    const salesItems = db.prepare(`
+      SELECT COALESCE(SUM((si.unit_price - p.price_achat) * si.qty), 0) as margin
+      FROM sale_items si JOIN products p ON si.product_id = p.id
+      JOIN sales s ON si.sale_id = s.id
+      WHERE date(s.created_at) = date('now') AND s.store_id = ?
+    `).get(sid) as any;
+
+    const ca = (caRow?.ca || 0) - (returnsRow?.ret || 0);
+    const dep = depensesRow?.dep || 0;
+    const beneficeBrut = Math.max(0, salesItems?.margin || 0);
+    const beneficeNet = Math.max(0, beneficeBrut - dep);
+    return { ca, dep, beneficeNet, dette: Math.max(0, detteRow?.dette || 0) };
   });
 }

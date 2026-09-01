@@ -23,7 +23,9 @@ import {
   Lock,
   User,
   ShoppingBag,
-  Bike
+  Bike,
+  LayoutGrid,
+  LayoutList
 } from 'lucide-react';
 
 export const POSPage: React.FC = () => {
@@ -69,6 +71,11 @@ export const POSPage: React.FC = () => {
   const [selectedPastSale, setSelectedPastSale] = useState<any | null>(null);
   const [returnItemsState, setReturnItemsState] = useState<Record<number, number>>({});
 
+  // View toggle: cards or list
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
+  // Daily KPI
+  const [dailyKpi, setDailyKpi] = useState<any>(null);
+
   // Hover Tooltip (2s delay — shows compatible motos in red card)
   const [hoveredProduct, setHoveredProduct] = useState<Product | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -106,6 +113,8 @@ export const POSPage: React.FC = () => {
       }
     });
     invokeIpc<Client[]>('get-clients').then(setClients);
+    // Load daily KPI
+    invokeIpc<any>('get-daily-kpi', currentStore?.id || 1).then(setDailyKpi).catch(() => {});
   }, []);
 
   // Global Barcode Scanner HID listener
@@ -341,7 +350,68 @@ export const POSPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Product Cards Grid */}
+        {/* Daily KPI mini dashboard */}
+        {dailyKpi && (
+          <div className="px-4 pb-2 pt-1 grid grid-cols-4 gap-2 shrink-0">
+            <div className="bg-slate-800/60 border border-slate-700 rounded-xl px-3 py-2 text-center">
+              <p className="text-[9px] text-slate-400 font-bold uppercase">CA Jour</p>
+              <p className="text-sm font-black text-blue-400 font-mono">{Math.round((dailyKpi.ca || 0) / 100).toLocaleString('fr-DZ')} DA</p>
+            </div>
+            <div className="bg-slate-800/60 border border-slate-700 rounded-xl px-3 py-2 text-center">
+              <p className="text-[9px] text-slate-400 font-bold uppercase">Bénéfice Net</p>
+              <p className="text-sm font-black text-emerald-400 font-mono">{Math.round((dailyKpi.beneficeNet || 0) / 100).toLocaleString('fr-DZ')} DA</p>
+            </div>
+            <div className="bg-slate-800/60 border border-slate-700 rounded-xl px-3 py-2 text-center">
+              <p className="text-[9px] text-slate-400 font-bold uppercase">Dépenses</p>
+              <p className="text-sm font-black text-rose-400 font-mono">{Math.round((dailyKpi.dep || 0) / 100).toLocaleString('fr-DZ')} DA</p>
+            </div>
+            <div className="bg-slate-800/60 border border-slate-700 rounded-xl px-3 py-2 text-center">
+              <p className="text-[9px] text-slate-400 font-bold uppercase">Dettes Clients</p>
+              <p className="text-sm font-black text-amber-400 font-mono">{Math.round((dailyKpi.dette || 0) / 100).toLocaleString('fr-DZ')} DA</p>
+            </div>
+          </div>
+        )}
+
+        {/* View toggle + search empty state */}
+        <div className="px-4 pb-2 flex items-center justify-between shrink-0">
+          <p className="text-[10px] text-slate-500">
+            {searchQuery ? `${products.length} résultat(s)` : isAr ? 'ابحث عن منتج لإضافته' : 'Tapez pour rechercher un produit'}
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setViewMode('cards')}
+              className={`p-1.5 rounded-lg transition-colors ${
+                viewMode === 'cards' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Vue Cartes"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded-lg transition-colors ${
+                viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Vue Liste"
+            >
+              <LayoutList className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Empty state */}
+        {!searchQuery && (
+          <div className="flex-1 flex items-center justify-center flex-col gap-4 text-slate-600">
+            <Search className="w-12 h-12 opacity-20" />
+            <div className="text-center">
+              <p className="font-bold text-slate-400">{isAr ? 'اكتب اسم القطعة أو امسح الباركود' : 'Recherchez un article ou scannez un code-barres'}</p>
+              <p className="text-xs text-slate-600 mt-1">{isAr ? 'القائمة فارغة — فقط نتائج البحث ستظهر هنا' : "La grille est vide — seuls les résultats de recherche s'affichent"}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Product Cards/List Grid */}
+        {searchQuery && viewMode === 'cards' && (
         <div className="flex-1 p-4 overflow-y-auto grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 content-start relative">
           {products.map(p => {
             const stockQty = p.stock?.find(s => s.storeId === currentStore?.id)?.quantity || 0;
@@ -480,6 +550,61 @@ export const POSPage: React.FC = () => {
             );
           })()}
         </div>
+        )}
+
+        {/* List view */}
+        {searchQuery && viewMode === 'list' && (
+          <div className="flex-1 overflow-y-auto">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-800/80 text-slate-400 uppercase font-bold border-b border-slate-700 sticky top-0">
+                <tr>
+                  <th className="px-4 py-2.5">Article</th>
+                  <th className="px-4 py-2.5">Catégorie</th>
+                  <th className="px-4 py-2.5 text-center">Stock</th>
+                  <th className="px-4 py-2.5 text-right">Prix Détail</th>
+                  <th className="px-4 py-2.5 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {products.map(p => {
+                  const stockQty = p.stock?.find(s => s.storeId === currentStore?.id)?.quantity || 0;
+                  const isOut = stockQty <= 0;
+                  return (
+                    <tr
+                      key={p.id}
+                      className={`transition-colors ${
+                        isOut ? 'opacity-50' : 'hover:bg-slate-800/50 cursor-pointer'
+                      }`}
+                      onClick={() => !isOut && addToCart(p, 'detail')}
+                    >
+                      <td className="px-4 py-2.5">
+                        <div className="font-bold text-white">{p.name}</div>
+                        <div className="text-[10px] font-mono text-blue-400">{p.code}</div>
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-400">{p.categoryName || p.brandName || '—'}</td>
+                      <td className="px-4 py-2.5 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          isOut ? 'bg-rose-500/20 text-rose-400' : stockQty <= 5 ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'
+                        }`}>{stockQty}</span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-mono font-bold text-emerald-400">{formatDZD(p.priceDetail)}</td>
+                      <td className="px-4 py-2.5 text-center">
+                        <button
+                          disabled={isOut}
+                          onClick={e => { e.stopPropagation(); !isOut && addToCart(p, 'detail'); }}
+                          className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white text-[10px] font-bold rounded-lg"
+                        >
+                          + Panier
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
       </div>
 
       {/* Right Column: POS Cart & Checkout Panel */}
@@ -556,8 +681,8 @@ export const POSPage: React.FC = () => {
                 </div>
 
                 {/* Qty & Price controls */}
-                <div className="flex items-center justify-between pt-1 border-t border-slate-900">
-                  <div className="flex items-center gap-1.5 bg-slate-900 rounded-xl p-1 border border-slate-800">
+                <div className="flex items-center justify-between pt-1 border-t border-slate-900 gap-2">
+                  <div className="flex items-center gap-1.5 bg-slate-900 rounded-xl p-1 border border-slate-800 shrink-0">
                     <button
                       onClick={() => updateCartQty(it.product.id, it.qty - 1)}
                       className="w-6 h-6 bg-slate-800 hover:bg-slate-700 text-white rounded-lg flex items-center justify-center font-bold text-xs"
@@ -573,7 +698,24 @@ export const POSPage: React.FC = () => {
                     </button>
                   </div>
 
-                  <span className="font-mono font-black text-sm text-emerald-400">{formatDZD(it.lineTotal)}</span>
+                  {/* Editable Unit Price */}
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={Math.round((it.unitPrice || 0) / 100)}
+                      onChange={e => {
+                        const val = Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 100));
+                        updateCartPrice(it.product.id, val);
+                      }}
+                      title={isAr ? 'تعديل السعر الفردي' : 'Modifier prix unitaire'}
+                      className="w-20 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-white text-center outline-none focus:border-blue-500"
+                    />
+                    <span className="text-[10px] text-slate-500 font-bold">DA</span>
+                  </div>
+
+                  <span className="font-mono font-black text-xs text-emerald-400 shrink-0">{formatDZD(it.lineTotal)}</span>
                 </div>
               </div>
             ))

@@ -56,6 +56,7 @@ export const LoginPage: React.FC = () => {
             { module: 'clients', canView: true, canEdit: true },
             { module: 'fournisseurs', canView: true, canEdit: false },
             { module: 'rapport', canView: true, canEdit: false },
+            { module: 'depenses', canView: true, canEdit: true },
             { module: 'zakat', canView: false, canEdit: false },
             { module: 'settings', canView: true, canEdit: false }
           ]
@@ -76,6 +77,7 @@ export const LoginPage: React.FC = () => {
             { module: 'clients', canView: true, canEdit: true },
             { module: 'fournisseurs', canView: true, canEdit: false },
             { module: 'rapport', canView: true, canEdit: false },
+            { module: 'depenses', canView: true, canEdit: true },
             { module: 'zakat', canView: false, canEdit: false },
             { module: 'settings', canView: true, canEdit: false }
           ]

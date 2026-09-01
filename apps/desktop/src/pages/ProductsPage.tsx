@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { invokeIpc } from '../api/electronBridge';
-import { Product, ColorMode, PriceTier } from '@gestion-veloo/shared';
+import { Product, ColorMode } from '@gestion-veloo/shared';
 import { formatDZD } from '@gestion-veloo/shared';
 import { COLOR_MODES, COLOR_MODE_LABELS } from '@gestion-veloo/shared';
 import { generateBarcodeValue } from '@gestion-veloo/shared';
@@ -10,23 +10,20 @@ import {
   FileText, 
   Search, 
   Barcode, 
-  Tag, 
-  Layers, 
   Plus, 
   X, 
-  Check, 
   Printer, 
-  DollarSign, 
-  Bike,
-  Sparkles,
-  Palette,
-  Scan
+  Palette, 
+  Pen, 
+  Wrench, 
+  Camera, 
+  Bike
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
 export const ProductsPage: React.FC = () => {
-  const { currentStore, capital, setCapital, hasPermission, lang, theme } = useStore();
+  const { currentStore, setCapital, hasPermission, lang, theme } = useStore();
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
 
@@ -36,11 +33,13 @@ export const ProductsPage: React.FC = () => {
   const [brands, setBrands] = useState<any[]>([]);
   const [colors, setColors] = useState<any[]>([]);
   const [motorcycles, setMotorcycles] = useState<any[]>([]);
+  const [locations, setLocations] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Add/Edit Product Modal State
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [customCode, setCustomCode] = useState('');
   const [name, setName] = useState('');
   const [categoryId, setCategoryId] = useState<number | ''>('');
   const [brandId, setBrandId] = useState<number | ''>('');
@@ -58,7 +57,17 @@ export const ProductsPage: React.FC = () => {
   const [compatibleMotos, setCompatibleMotos] = useState<number[]>([]);
   const [motoSearchFilter, setMotoSearchFilter] = useState('');
   const [initialStockStore1, setInitialStockStore1] = useState('0');
-  const [initialStockStore2, setInitialStockStore2] = useState('0');
+  const [photoBase64, setPhotoBase64] = useState<string>('');
+
+  // Inline Add New Color State
+  const [showAddColorForm, setShowAddColorForm] = useState(false);
+  const [newColorName, setNewColorName] = useState('');
+  const [newColorHex, setNewColorHex] = useState('#3b82f6');
+
+  // Hover Tooltip (2s delay for compat motos)
+  const [hoveredProductRow, setHoveredProductRow] = useState<Product | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const hoverRowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Proforma Modal State
   const [showProformaModal, setShowProformaModal] = useState(false);
@@ -68,9 +77,10 @@ export const ProductsPage: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [prods, meta] = await Promise.all([
-        invokeIpc<Product[]>('get-products', { q: search, storeId: currentStore?.id }),
-        invokeIpc<any>('get-metadata')
+      const [prods, meta, locs] = await Promise.all([
+        invokeIpc<Product[]>('get-products', { q: search, storeId: currentStore?.id || 1 }),
+        invokeIpc<any>('get-metadata'),
+        invokeIpc<string[]>('get-locations').catch(() => [])
       ]);
 
       setProducts(prods || []);
@@ -80,10 +90,11 @@ export const ProductsPage: React.FC = () => {
         setColors(meta.colors || []);
         setMotorcycles(meta.motorcycleModels || []);
       }
+      setLocations(locs || []);
 
       if (prods) {
         const cap = prods.reduce((acc, p) => {
-          const qty = p.stock?.find(s => s.storeId === currentStore?.id)?.quantity || 0;
+          const qty = p.stock?.find(s => s.storeId === (currentStore?.id || 1))?.quantity || 0;
           return acc + (p.priceAchat * qty);
         }, 0);
         setCapital(cap);
@@ -131,26 +142,62 @@ export const ProductsPage: React.FC = () => {
     setBarcodesList(barcodesList.filter(b => b !== bc));
   };
 
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert(isAr ? 'حجم الصورة كبير جداً (أقصى حد 2 ميغا)' : 'Photo trop volumineuse (max 2 Mo)');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setPhotoBase64(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAddNewColor = async () => {
+    if (!newColorName.trim()) return;
+    try {
+      const res = await invokeIpc<any>('add-color', { 
+        name: newColorName.trim().toUpperCase(), 
+        hexCode: newColorHex 
+      });
+      if (res && res.id) {
+        setColors([...colors, { id: res.id, name: res.name, hexCode: res.hexCode }]);
+        setSelectedColorId(res.id);
+        setNewColorName('');
+        setShowAddColorForm(false);
+        alert(isAr ? 'تمت إضافة اللون بنجاح' : `Couleur "${res.name}" ajoutée avec succès !`);
+      }
+    } catch (err: any) {
+      alert(`Erreur: ${err.message}`);
+    }
+  };
+
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const pAchat = Math.round(parseFloat(priceAchat || '0') * 100);
       const pDetail = Math.round(parseFloat(priceDetail || '0') * 100);
-      const pSemi = Math.round(parseFloat(priceSemiGros || '0') * 100);
-      const pGros = Math.round(parseFloat(priceGros || '0') * 100);
+      const pSemi = Math.round(parseFloat(priceSemiGros || priceDetail || '0') * 100);
+      const pGros = Math.round(parseFloat(priceGros || priceDetail || '0') * 100);
 
       if (!name.trim()) throw new Error(isAr ? 'اسم القطعة مطلوب' : 'Nom du produit obligatoire');
       if (pDetail <= 0) throw new Error(isAr ? 'سعر التجزئة يجب أن يكون أكبر من 0' : 'Prix détail obligatoire');
 
-      const payload = {
-        name,
+      const payload: any = {
+        name: name.toUpperCase().trim(),
+        customCode: customCode.trim() ? customCode.trim().toUpperCase() : undefined,
         categoryId: categoryId || null,
         brandId: brandId || null,
         priceAchat: pAchat,
         priceDetail: pDetail,
         priceSemiGros: pSemi || pDetail,
         priceGros: pGros || pDetail,
-        location,
+        location: location.toUpperCase().trim(),
         colorMode,
         colorIds: colorMode === 'single' ? (selectedColorId ? [Number(selectedColorId)] : []) : variantColorIds,
         mergeColorIds: colorMode === 'merged' ? mergeColorIds : [],
@@ -158,16 +205,21 @@ export const ProductsPage: React.FC = () => {
         compatibleModelIds: compatibleMotos,
         compatibleMotos: compatibleMotos,
         initialStock: {
-          '1': parseInt(initialStockStore1, 10) || 0,
-          '2': parseInt(initialStockStore2, 10) || 0
+          '1': parseInt(initialStockStore1, 10) || 0
         }
       };
 
       if (editingProduct) {
         await invokeIpc('update-product', { ...payload, id: editingProduct.id });
+        if (photoBase64) {
+          await invokeIpc('update-product-photo', { productId: editingProduct.id, photoBase64 });
+        }
         alert(isAr ? 'تم تعديل المنتج بنجاح!' : 'Produit modifié avec succès !');
       } else {
-        await invokeIpc('create-product', payload);
+        const created = await invokeIpc<any>('create-product', payload);
+        if (created?.id && photoBase64) {
+          await invokeIpc('update-product-photo', { productId: created.id, photoBase64 });
+        }
         alert(isAr ? 'تمت إضافة المنتج بنجاح!' : 'Produit créé avec succès !');
       }
       setShowAddModal(false);
@@ -180,6 +232,7 @@ export const ProductsPage: React.FC = () => {
 
   const resetForm = () => {
     setEditingProduct(null);
+    setCustomCode('');
     setName('');
     setCategoryId('');
     setBrandId('');
@@ -197,19 +250,23 @@ export const ProductsPage: React.FC = () => {
     setCompatibleMotos([]);
     setMotoSearchFilter('');
     setInitialStockStore1('0');
-    setInitialStockStore2('0');
+    setPhotoBase64('');
+    setShowAddColorForm(false);
+    setNewColorName('');
+    setNewColorHex('#3b82f6');
   };
 
   const openEditModal = (p: Product) => {
     setEditingProduct(p);
+    setCustomCode(p.code);
     setName(p.name);
     setCategoryId(p.categoryId || '');
     setBrandId(p.brandId || '');
     setPriceAchat(String((p.priceAchat || 0) / 100));
     setPriceDetail(String((p.priceDetail || 0) / 100));
-    setPriceSemiGros(String((p.priceSemiGros || 0) / 100));
-    setPriceGros(String((p.priceGros || 0) / 100));
-    setLocation(p.location || '');
+    setPriceSemiGros(String((p.priceSemiGros || p.priceDetail || 0) / 100));
+    setPriceGros(String((p.priceGros || p.priceDetail || 0) / 100));
+    setLocation((p as any).location || '');
     setColorMode(p.colorMode);
     const colorIds = (p.colors || []).map((c: any) => c.colorId);
     if (p.colorMode === 'single') setSelectedColorId(colorIds[0] || '');
@@ -217,9 +274,9 @@ export const ProductsPage: React.FC = () => {
     else if (p.colorMode === 'merged') setMergeColorIds(colorIds);
     setBarcodesList((p.barcodes || []).map((b: any) => b.barcodeValue));
     setCompatibleMotos(((p as any).compatibleModels || []).map((m: any) => m.id));
+    setPhotoBase64((p as any).photo_base64 || '');
     setMotoSearchFilter('');
     setInitialStockStore1('0');
-    setInitialStockStore2('0');
     setShowAddModal(true);
   };
 
@@ -264,6 +321,18 @@ export const ProductsPage: React.FC = () => {
     !motoSearchFilter || m.name.toLowerCase().includes(motoSearchFilter.toLowerCase())
   );
 
+  // Category conditional check for color picker
+  const selectedCat = categories.find(c => c.id === categoryId);
+  const catNameLower = (selectedCat?.name || '').toLowerCase();
+  const shouldShowColors = !categoryId || 
+    catNameLower.includes('carénage') || 
+    catNameLower.includes('carenage') || 
+    catNameLower.includes('carinage') || 
+    catNameLower.includes('accessoire') || 
+    catNameLower.includes('access') ||
+    catNameLower.includes('carrosserie') ||
+    catNameLower.includes('couleur');
+
   return (
     <div className={`p-6 space-y-6 h-full overflow-y-auto transition-colors ${
       isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
@@ -279,8 +348,8 @@ export const ProductsPage: React.FC = () => {
           </h1>
           <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
             {isAr 
-              ? 'إدارة القطع، الألوان، التوافق مع الموتوات (36 طراز)، وطباعة Devis Proforma PDF' 
-              : 'Gestion des pièces, couleurs (135), compatibilité motos/scooters (36 modèles) et devis proforma.'}
+              ? 'إدارة القطع، الألوان، التوافق مع الموتوات، وإمكانية إضافة الصور ومواقع التخزين' 
+              : 'Gestion des pièces, codes manuels, photos, emplacements en rayon et compatibilités motos.'}
           </p>
         </div>
 
@@ -297,7 +366,7 @@ export const ProductsPage: React.FC = () => {
 
           {hasPermission('produits', 'edit') && (
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={() => { resetForm(); setShowAddModal(true); }}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs shadow-md shadow-blue-600/30 transition-all"
             >
               <PackagePlus className="w-4 h-4" />
@@ -315,12 +384,17 @@ export const ProductsPage: React.FC = () => {
         <input
           type="text"
           value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder={isAr ? 'ابحث بالمرجع ART-XXXXX، اسم القطعة، الماركة، أو طراز الموتو المتوافق...' : 'Rechercher par référence ART-XXXXX, désignation, marque, modèle moto compatible ou code-barres...'}
-          className={`w-full text-xs font-bold outline-none bg-transparent ${
+          onChange={e => setSearch(e.target.value.toUpperCase())}
+          placeholder={isAr ? 'ابحث برمز القطعة، الاسم، الماركة، أو الموتو المتوافقة...' : 'Rechercher par code article, désignation, marque, moto compatible ou code-barres...'}
+          className={`w-full text-xs font-bold outline-none bg-transparent uppercase ${
             isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
           }`}
         />
+        {search && (
+          <button onClick={() => setSearch('')} className="text-slate-400 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Products Table */}
@@ -333,46 +407,76 @@ export const ProductsPage: React.FC = () => {
               isDark ? 'bg-slate-800/80 text-slate-400 border-slate-800' : 'bg-slate-100 text-slate-600 border-slate-200'
             }`}>
               <tr>
+                <th className="px-3 py-3 text-center w-8">#</th>
                 <th className="px-4 py-3">{isAr ? 'الرمز' : 'Code Article'}</th>
-                <th className="px-4 py-3">{isAr ? 'تعيين القطعة والموتوات' : 'Désignation & Compatibilité Motos'}</th>
-                <th className="px-4 py-3">{isAr ? 'الموقع في المخزن' : 'Emplacement'}</th>
+                <th className="px-4 py-3">{isAr ? 'تعيين القطعة' : 'Désignation'}</th>
+                <th className="px-4 py-3">{isAr ? 'الموقع' : 'Emplacement'}</th>
                 <th className="px-4 py-3">{isAr ? 'الصنف والماركة' : 'Catégorie & Marque'}</th>
-                <th className="px-4 py-3">{isAr ? 'اللون' : 'Gestion Couleur'}</th>
+                <th className="px-4 py-3">{isAr ? 'اللون' : 'Couleur'}</th>
                 <th className="px-4 py-3 text-right">{isAr ? 'سعر الشراء' : 'Prix Achat'}</th>
                 <th className="px-4 py-3 text-right">{isAr ? 'التجزئة' : 'Détail'}</th>
                 <th className="px-4 py-3 text-right">{isAr ? 'نصف الجملة' : 'Semi-Gros'}</th>
                 <th className="px-4 py-3 text-right">{isAr ? 'الجملة' : 'Gros'}</th>
-                <th className="px-4 py-3 text-center">{isAr ? 'المخزون' : 'Stock Dispo'}</th>
+                <th className="px-4 py-3 text-center">{isAr ? 'المخزون' : 'Quantité'}</th>
                 {hasPermission('produits', 'edit') && <th className="px-4 py-3 text-center">{isAr ? 'تعديل' : 'Modifier'}</th>}
               </tr>
             </thead>
             <tbody className={`divide-y ${isDark ? 'divide-slate-800' : 'divide-slate-200'}`}>
-              {products.map(p => {
-                const stockQty = p.stock?.find(s => s.storeId === currentStore?.id)?.quantity || 0;
+              {products.map((p, idx) => {
+                const stockQty = p.stock?.find(s => s.storeId === (currentStore?.id || 1))?.quantity || 0;
                 const productLocation = (p as any).location || '';
+                const compatModels = (p as any).compatibleModels || [];
+                const hasPhoto = !!(p as any).photo_base64;
+
                 return (
-                  <tr key={p.id} className={isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}>
-                    <td className="px-4 py-3 font-mono font-bold text-blue-400">{p.code}</td>
+                  <tr 
+                    key={p.id} 
+                    className={isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}
+                  >
+                    <td className="px-3 py-3 text-center text-slate-500 font-mono text-[11px] w-8">{idx + 1}</td>
+                    <td className="px-4 py-3 font-mono font-bold text-blue-400 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        {hasPhoto && (
+                          <img 
+                            src={(p as any).photo_base64} 
+                            alt="" 
+                            className="w-7 h-7 rounded-lg object-cover border border-slate-700 shrink-0" 
+                          />
+                        )}
+                        <span>{p.code}</span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <div className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{p.name}</div>
                       
-                      {/* Compatible Motorcycles Badges */}
-                      {(p as any).compatibleModels && (p as any).compatibleModels.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {(p as any).compatibleModels.map((m: any) => (
-                            <span key={m.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                              <Bike className="w-2.5 h-2.5" />
-                              <span>{m.name}</span>
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      {/* Sub-line: Barcodes + Moto compat count with 2-second hover tooltip */}
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {compatModels.length > 0 && (
+                          <button
+                            type="button"
+                            onMouseEnter={(e) => {
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                              setTooltipPos({ x: rect.left, y: rect.top });
+                              hoverRowTimer.current = setTimeout(() => setHoveredProductRow(p), 2000);
+                            }}
+                            onMouseLeave={() => {
+                              if (hoverRowTimer.current) clearTimeout(hoverRowTimer.current);
+                              setHoveredProductRow(null);
+                            }}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 cursor-help"
+                            title={isAr ? 'اضغط مطولاً لرؤية الموتوات المتوافقة' : 'Maintenir 2s pour voir les motos compatibles'}
+                          >
+                            <Wrench className="w-2.5 h-2.5" />
+                            <span>{compatModels.length} moto(s)</span>
+                          </button>
+                        )}
 
-                      {p.barcodes && p.barcodes.length > 0 && (
-                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                          {p.barcodes.map(b => b.barcodeValue).join(' | ')}
-                        </div>
-                      )}
+                        {p.barcodes && p.barcodes.length > 0 && (
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {p.barcodes.map(b => b.barcodeValue).join(' | ')}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {productLocation ? (
@@ -417,7 +521,7 @@ export const ProductsPage: React.FC = () => {
                             isDark ? 'text-slate-400 hover:text-blue-400 hover:bg-blue-500/10' : 'text-slate-500 hover:text-blue-600 hover:bg-blue-50'
                           }`}
                         >
-                          <Sparkles className="w-3.5 h-3.5" />
+                          <Pen className="w-3.5 h-3.5" />
                         </button>
                       </td>
                     )}
@@ -429,7 +533,36 @@ export const ProductsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal: Add Product with 4 Full Sections */}
+      {/* Moto Compatibility Tooltip Card (shown after 2s hold) */}
+      {hoveredProductRow && (() => {
+        const compat = (hoveredProductRow as any).compatibleModels || [];
+        return (
+          <div
+            className="fixed z-[9999] pointer-events-none"
+            style={{ left: Math.min(tooltipPos.x, window.innerWidth - 300), top: Math.max(tooltipPos.y - 120, 20) }}
+          >
+            <div className="bg-slate-900/98 border border-blue-500/50 backdrop-blur-md rounded-2xl p-4 w-72 shadow-2xl shadow-blue-900/40 animate-in fade-in duration-200">
+              <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-800">
+                <Bike className="w-4 h-4 text-blue-400" />
+                <p className="text-white font-bold text-xs line-clamp-1">{hoveredProductRow.name}</p>
+              </div>
+              <p className="text-[10px] text-blue-400 font-bold uppercase mb-2">
+                {isAr ? `متوافق مع ${compat.length} طراز:` : `Modèles compatibles (${compat.length}):`}
+              </p>
+              <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+                {compat.map((m: any) => (
+                  <span key={m.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-950/60 text-blue-300 border border-blue-800/50">
+                    <Bike className="w-2.5 h-2.5" />
+                    {m.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Modal: Add/Edit Product */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className={`border rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-6 shadow-2xl ${
@@ -456,7 +589,7 @@ export const ProductsPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateProduct} className="space-y-6">
-              {/* Section 1: General Info & 3-Tier Prices */}
+              {/* Section 1: General Info */}
               <div className={`space-y-3 p-4 rounded-2xl border ${
                 isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
               }`}>
@@ -465,17 +598,36 @@ export const ProductsPage: React.FC = () => {
                 </h4>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="md:col-span-2">
+                  <div>
+                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      {isAr ? 'كود المقال (أدخله يدوياً أو اتركه فارغاً لتوليده)' : 'Code Article (Manuel ou vide pour auto)'}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: FLT-001, ART-0005..."
+                      value={customCode}
+                      onChange={e => setCustomCode(e.target.value.toUpperCase())}
+                      disabled={!!editingProduct}
+                      className={`w-full mt-1 border rounded-xl px-3.5 py-2 text-xs font-mono font-bold outline-none uppercase ${
+                        editingProduct ? 'opacity-50 cursor-not-allowed' : ''
+                      } ${
+                        isDark ? 'bg-slate-800 border-slate-700 text-blue-400 placeholder-slate-500' : 'bg-white border-slate-300 text-blue-700 placeholder-slate-400'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
                     <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                       {isAr ? 'تعيين القطعة *' : 'Désignation de la pièce *'}
                     </label>
                     <input
                       type="text"
                       required
-                      placeholder={isAr ? 'مثال: بوجي إيريديوم CR8EIX' : 'Ex: Bougie d\'Allumage Iridium CR8EIX'}
+                      autoFocus
+                      placeholder={isAr ? 'مثال: بوجي إيريديوم CR8EIX' : 'Ex: BOUGIE ALLUMAGE IRIDIUM CR8EIX'}
                       value={name}
-                      onChange={e => setName(e.target.value)}
-                      className={`w-full mt-1 border rounded-xl px-3.5 py-2 text-xs font-bold outline-none ${
+                      onChange={e => setName(e.target.value.toUpperCase())}
+                      className={`w-full mt-1 border rounded-xl px-3.5 py-2 text-xs font-bold outline-none uppercase ${
                         isDark ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
                       }`}
                     />
@@ -515,17 +667,21 @@ export const ProductsPage: React.FC = () => {
 
                   <div>
                     <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {isAr ? 'الموقع في المخزن (مثال: A-06، L-08)' : 'Emplacement en Magasin (ex: A-06, L-08)'}
+                      {isAr ? 'الموقع في المخزن (اختر أو اكتب جديد)' : 'Emplacement Rayon (ex: A-06, L-08)'}
                     </label>
                     <input
                       type="text"
+                      list="locations-list"
                       placeholder="A-06"
                       value={location}
                       onChange={e => setLocation(e.target.value.toUpperCase())}
-                      className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none ${
+                      className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none uppercase ${
                         isDark ? 'bg-slate-800 border-slate-700 text-amber-300 placeholder-slate-500' : 'bg-white border-slate-300 text-amber-700 placeholder-slate-400'
                       }`}
                     />
+                    <datalist id="locations-list">
+                      {locations.map(loc => <option key={loc} value={loc} />)}
+                    </datalist>
                   </div>
 
                   <div>
@@ -563,14 +719,15 @@ export const ProductsPage: React.FC = () => {
 
                   <div>
                     <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {isAr ? 'سعر نصف الجملة (دج)' : 'Prix Semi-Gros (DA)'}
+                      {isAr ? 'سعر نصف الجملة (دج) — يتبع التجزئة إذا فارغ' : 'Prix Semi-Gros (DA) — Suit détail si vide'}
                     </label>
                     <input
                       type="number"
                       step="0.01"
-                      placeholder="0.00"
+                      placeholder={priceDetail || "0.00"}
                       value={priceSemiGros}
                       onChange={e => setPriceSemiGros(e.target.value)}
+                      onBlur={e => { if (!e.target.value || parseFloat(e.target.value) === 0) setPriceSemiGros(priceDetail); }}
                       className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono outline-none ${
                         isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
                       }`}
@@ -579,19 +736,56 @@ export const ProductsPage: React.FC = () => {
 
                   <div>
                     <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {isAr ? 'سعر الجملة (دج)' : 'Prix Gros (DA)'}
+                      {isAr ? 'سعر الجملة (دج) — يتبع التجزئة إذا فارغ' : 'Prix Gros (DA) — Suit détail si vide'}
                     </label>
                     <input
                       type="number"
                       step="0.01"
-                      placeholder="0.00"
+                      placeholder={priceDetail || "0.00"}
                       value={priceGros}
                       onChange={e => setPriceGros(e.target.value)}
+                      onBlur={e => { if (!e.target.value || parseFloat(e.target.value) === 0) setPriceGros(priceDetail); }}
                       className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono outline-none ${
                         isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
                       }`}
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Section: Photo Upload */}
+              <div className={`space-y-3 p-4 rounded-2xl border ${
+                isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                  isDark ? 'text-slate-300' : 'text-slate-700'
+                }`}>
+                  <Camera className="w-3.5 h-3.5 text-blue-400" /> {isAr ? 'صورة المنتج' : 'Photo du Produit'}
+                </h4>
+                <div className="flex items-center gap-4">
+                  {photoBase64 ? (
+                    <div className="relative">
+                      <img src={photoBase64} alt="Preview" className="w-20 h-20 rounded-xl object-cover border border-slate-700 shadow-md" />
+                      <button 
+                        type="button" 
+                        onClick={() => setPhotoBase64('')}
+                        className="absolute -top-2 -right-2 w-5 h-5 bg-rose-600 text-white rounded-full flex items-center justify-center text-xs font-bold shadow"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className={`flex flex-col items-center justify-center w-20 h-20 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
+                      isDark ? 'border-slate-700 hover:border-blue-500 text-slate-500 hover:text-blue-400' : 'border-slate-300 hover:border-blue-500 text-slate-400 hover:text-blue-600'
+                    }`}>
+                      <Camera className="w-6 h-6 mb-1" />
+                      <span className="text-[9px] font-bold text-center">Ajouter</span>
+                      <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                    </label>
+                  )}
+                  <p className="text-[11px] text-slate-400">
+                    {isAr ? 'اختر صورة من جهازك (JPG/PNG، أقصى حد 2 ميغا)' : 'Image JPG/PNG affichée dans le catalogue (max 2 Mo)'}
+                  </p>
                 </div>
               </div>
 
@@ -653,93 +847,136 @@ export const ProductsPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Section 3: Color Modes */}
-              <div className={`space-y-3 p-4 rounded-2xl border ${
-                isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
-              }`}>
-                <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                  isDark ? 'text-slate-300' : 'text-slate-700'
+              {/* Section 3: Colors (Conditional: only for Carénage, Accessoires, etc.) */}
+              {shouldShowColors && (
+                <div className={`space-y-3 p-4 rounded-2xl border ${
+                  isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
                 }`}>
-                  <Palette className="w-3.5 h-3.5 text-purple-500" /> 3. {isAr ? 'نظام إدارة الألوان (135 لون)' : 'Mode de Gestion des Couleurs (135 Couleurs)'}
-                </h4>
-
-                <div className="grid grid-cols-3 gap-2">
-                  {COLOR_MODES.map(mode => (
-                    <label
-                      key={mode}
-                      onClick={() => setColorMode(mode)}
-                      className={`p-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
-                        colorMode === mode
-                          ? 'bg-blue-600/20 border-blue-500 text-blue-400'
-                          : isDark ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-300 text-slate-700'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <input type="radio" checked={colorMode === mode} onChange={() => setColorMode(mode)} />
-                        {COLOR_MODE_LABELS[mode]}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-
-                {colorMode === 'single' && (
-                  <div>
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {isAr ? 'اختر اللون :' : 'Choisir la couleur :'}
-                    </label>
-                    <select
-                      value={selectedColorId}
-                      onChange={e => setSelectedColorId(e.target.value ? parseInt(e.target.value, 10) : '')}
-                      className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-bold outline-none ${
-                        isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
-                      }`}
-                    >
-                      <option value="">{isAr ? '-- اختر لوناً --' : '-- Sélectionner une couleur --'} ({colors.length} disponibles)</option>
-                      {colors.map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {(colorMode === 'variants' || colorMode === 'merged') && (
-                  <div className="space-y-2">
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {colorMode === 'variants'
-                        ? (isAr ? 'اختر خيارات الألوان المتوفرة :' : 'Sélectionner les déclinaisons de couleurs :')
-                        : (isAr ? 'اختر الألوان المدمجة في نفس القطعة (مثال: خوذة أسود + أحمر) :' : 'Sélectionner les couleurs composant l\'article (ex: Casque bicolore Noir + Rouge) :')}
-                    </label>
-                    <div className={`max-h-36 overflow-y-auto grid grid-cols-3 gap-1.5 p-2 rounded-xl border ${
-                      isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'
+                  <div className="flex items-center justify-between">
+                    <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                      isDark ? 'text-slate-300' : 'text-slate-700'
                     }`}>
-                      {colors.map(c => {
-                        const isChecked = colorMode === 'variants' ? variantColorIds.includes(c.id) : mergeColorIds.includes(c.id);
-                        return (
-                          <label key={c.id} className="flex items-center gap-1.5 text-xs cursor-pointer p-1 rounded hover:bg-blue-500/10">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={e => {
-                                if (colorMode === 'variants') {
-                                  if (e.target.checked) setVariantColorIds([...variantColorIds, c.id]);
-                                  else setVariantColorIds(variantColorIds.filter(id => id !== c.id));
-                                } else {
-                                  if (e.target.checked) setMergeColorIds([...mergeColorIds, c.id]);
-                                  else setMergeColorIds(mergeColorIds.filter(id => id !== c.id));
-                                }
-                              }}
-                            />
-                            <div className="w-2.5 h-2.5 rounded-full border border-slate-600 shrink-0" style={{ backgroundColor: c.hexCode }} />
-                            <span className="truncate text-[11px]">{c.name}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
+                      <Palette className="w-3.5 h-3.5 text-purple-500" /> 3. {isAr ? 'نظام إدارة الألوان' : 'Gestion des Couleurs'}
+                    </h4>
 
-              {/* Section 4: Motos & Scooters Compatibles (36 Models) */}
+                    <button
+                      type="button"
+                      onClick={() => setShowAddColorForm(!showAddColorForm)}
+                      className="flex items-center gap-1 text-[11px] font-bold text-purple-400 hover:text-purple-300"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>{showAddColorForm ? 'Fermer' : 'Ajouter Nouvelle Couleur'}</span>
+                    </button>
+                  </div>
+
+                  {/* Inline Add Color Form */}
+                  {showAddColorForm && (
+                    <div className={`p-3 rounded-xl border flex items-center gap-2 ${
+                      isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                    }`}>
+                      <input
+                        type="text"
+                        placeholder="Nom couleur (ex: BLEU NUIT)"
+                        value={newColorName}
+                        onChange={e => setNewColorName(e.target.value.toUpperCase())}
+                        className={`flex-1 border rounded-lg px-2.5 py-1.5 text-xs font-bold outline-none uppercase ${
+                          isDark ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900'
+                        }`}
+                      />
+                      <input
+                        type="color"
+                        value={newColorHex}
+                        onChange={e => setNewColorHex(e.target.value)}
+                        className="w-8 h-8 rounded-lg cursor-pointer border-0"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddNewColor}
+                        className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg"
+                      >
+                        Sauvegarder
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {COLOR_MODES.map(mode => (
+                      <label
+                        key={mode}
+                        onClick={() => setColorMode(mode)}
+                        className={`p-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                          colorMode === mode
+                            ? 'bg-blue-600/20 border-blue-500 text-blue-400'
+                            : isDark ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-300 text-slate-700'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <input type="radio" checked={colorMode === mode} onChange={() => setColorMode(mode)} />
+                          {COLOR_MODE_LABELS[mode]}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+
+                  {colorMode === 'single' && (
+                    <div>
+                      <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        {isAr ? 'اختر اللون :' : 'Choisir la couleur :'}
+                      </label>
+                      <select
+                        value={selectedColorId}
+                        onChange={e => setSelectedColorId(e.target.value ? parseInt(e.target.value, 10) : '')}
+                        className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-bold outline-none ${
+                          isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                        }`}
+                      >
+                        <option value="">{isAr ? '-- اختر لوناً --' : '-- Sélectionner une couleur --'} ({colors.length} disponibles)</option>
+                        {colors.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {(colorMode === 'variants' || colorMode === 'merged') && (
+                    <div className="space-y-2">
+                      <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        {colorMode === 'variants'
+                          ? (isAr ? 'اختر خيارات الألوان المتوفرة :' : 'Sélectionner les déclinaisons de couleurs :')
+                          : (isAr ? 'اختر الألوان المدمجة في نفس القطعة :' : 'Sélectionner les couleurs composant l\'article :')}
+                      </label>
+                      <div className={`max-h-36 overflow-y-auto grid grid-cols-3 gap-1.5 p-2 rounded-xl border ${
+                        isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'
+                      }`}>
+                        {colors.map(c => {
+                          const isChecked = colorMode === 'variants' ? variantColorIds.includes(c.id) : mergeColorIds.includes(c.id);
+                          return (
+                            <label key={c.id} className="flex items-center gap-1.5 text-xs cursor-pointer p-1 rounded hover:bg-blue-500/10">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={e => {
+                                  if (colorMode === 'variants') {
+                                    if (e.target.checked) setVariantColorIds([...variantColorIds, c.id]);
+                                    else setVariantColorIds(variantColorIds.filter(id => id !== c.id));
+                                  } else {
+                                    if (e.target.checked) setMergeColorIds([...mergeColorIds, c.id]);
+                                    else setMergeColorIds(mergeColorIds.filter(id => id !== c.id));
+                                  }
+                                }}
+                              />
+                              <div className="w-2.5 h-2.5 rounded-full border border-slate-600 shrink-0" style={{ backgroundColor: c.hexCode }} />
+                              <span className="truncate text-[11px]">{c.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Section 4: Motos & Scooters Compatibles */}
               <div className={`space-y-3 p-4 rounded-2xl border ${
                 isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
               }`}>
@@ -747,7 +984,7 @@ export const ProductsPage: React.FC = () => {
                   <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
                     isDark ? 'text-slate-300' : 'text-slate-700'
                   }`}>
-                    <Bike className="w-3.5 h-3.5 text-blue-500" /> 4. {isAr ? 'الدراجات والموتوات المتوافقة' : 'Compatibilité Motos & Scooters (36 Modèles)'}
+                    <Wrench className="w-3.5 h-3.5 text-blue-500" /> 4. {isAr ? 'الدراجات والموتوات المتوافقة' : 'Compatibilité Motos & Scooters'}
                   </h4>
                   <span className="text-[11px] font-bold text-blue-400">
                     {compatibleMotos.length} sélectionnée(s)
@@ -758,8 +995,8 @@ export const ProductsPage: React.FC = () => {
                   type="text"
                   placeholder={isAr ? 'تصفية الطرازات (CG125, SYM, VMS, YBR...)' : 'Filtrer les modèles (CG125, SYM, VMS, YBR, Fox...)'}
                   value={motoSearchFilter}
-                  onChange={e => setMotoSearchFilter(e.target.value)}
-                  className={`w-full border rounded-xl px-3 py-1.5 text-xs font-medium outline-none ${
+                  onChange={e => setMotoSearchFilter(e.target.value.toUpperCase())}
+                  className={`w-full border rounded-xl px-3 py-1.5 text-xs font-medium outline-none uppercase ${
                     isDark ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
                   }`}
                 />
@@ -791,33 +1028,21 @@ export const ProductsPage: React.FC = () => {
                 isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
               }`}>
                 <h4 className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  5. {isAr ? 'المخزون الأولي بالمحلات' : 'Stock Initial par Boutique'}
+                  5. {isAr ? 'المخزون الأولي' : 'Stock Initial'}
                 </h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Boutique 1 (Centre-Ville)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={initialStockStore1}
-                      onChange={e => setInitialStockStore1(e.target.value)}
-                      className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-bold text-center text-emerald-500 outline-none ${
-                        isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Boutique 2 (Zone Ind.)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={initialStockStore2}
-                      onChange={e => setInitialStockStore2(e.target.value)}
-                      className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-bold text-center text-emerald-500 outline-none ${
-                        isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'
-                      }`}
-                    />
-                  </div>
+                <div className="max-w-xs">
+                  <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    {isAr ? 'الكمية الأولية في المحل' : 'Quantité initiale en stock'}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={initialStockStore1}
+                    onChange={e => setInitialStockStore1(e.target.value)}
+                    className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-bold text-center text-emerald-500 outline-none ${
+                      isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'
+                    }`}
+                  />
                 </div>
               </div>
 
@@ -876,9 +1101,9 @@ export const ProductsPage: React.FC = () => {
               <input
                 type="text"
                 value={proformaClientName}
-                onChange={e => setProformaClientName(e.target.value)}
-                placeholder="Ex: SARL Moto Express Alger"
-                className={`w-full mt-1.5 border rounded-xl px-3.5 py-2.5 text-xs font-bold outline-none ${
+                onChange={e => setProformaClientName(e.target.value.toUpperCase())}
+                placeholder="Ex: SARL MOTO EXPRESS ALGER"
+                className={`w-full mt-1.5 border rounded-xl px-3.5 py-2.5 text-xs font-bold outline-none uppercase ${
                   isDark ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
                 }`}
               />

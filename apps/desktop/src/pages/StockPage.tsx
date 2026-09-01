@@ -6,9 +6,7 @@ import { formatDZD } from '@gestion-veloo/shared';
 import { 
   Boxes, 
   Search, 
-  ArrowRightLeft, 
   Edit3, 
-  Sparkles, 
   RefreshCw, 
   History,
   Filter,
@@ -56,12 +54,7 @@ export const StockPage: React.FC = () => {
   const [adjustNewQty, setAdjustNewQty] = useState('');
   const [adjustNote, setAdjustNote] = useState('');
 
-  // Inter-Store Transfer Modal
-  const [showTransferModal, setShowTransferModal] = useState(false);
-  const [transferItem, setTransferItem] = useState<StockItem | null>(null);
-  const [transferQty, setTransferQty] = useState('1');
-  const [toStoreId, setToStoreId] = useState<number>(2);
-  const [transferNote, setTransferNote] = useState('');
+
 
   const loadStock = async () => {
     setLoading(true);
@@ -109,26 +102,7 @@ export const StockPage: React.FC = () => {
     }
   };
 
-  const handleExecuteTransfer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!transferItem) return;
-    try {
-      await invokeIpc('transfer-stock', {
-        fromStoreId: transferItem.storeId,
-        toStoreId,
-        productId: transferItem.productId,
-        qty: parseInt(transferQty, 10) || 1,
-        userId: currentUser?.id || 1,
-        note: transferNote
-      });
 
-      alert(isAr ? 'تم التحويل بين المتاجر بنجاح (الرمزان 94 و 95)!' : 'Transfert inter-boutique exécuté avec succès (Codes 94 & 95) !');
-      setShowTransferModal(false);
-      loadStock();
-    } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
-    }
-  };
 
   const getMovementBadge = (code: number | null) => {
     switch (code) {
@@ -171,7 +145,7 @@ export const StockPage: React.FC = () => {
               {isAr ? 'إدارة المخزون وتتبع الحركات' : 'Gestion des Stocks & Mouvements'}
             </h1>
             <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 text-[11px] font-bold rounded-full border border-emerald-500/30 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-emerald-400" /> {isAr ? 'تتبع شامل لجميع العمليات' : 'Traçabilité Tous Mouvements'}
+              ✦ {isAr ? 'تتبع شامل لجميع العمليات' : 'Traçabilité Tous Mouvements'}
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
@@ -358,40 +332,23 @@ export const StockPage: React.FC = () => {
                     <td className="px-4 py-3 text-right font-mono text-slate-400">{formatDZD(s.priceAchat)}</td>
                     <td className="px-4 py-3 text-right font-bold text-emerald-400">{formatDZD(s.priceDetail)}</td>
 
-                    {/* Actions: Adjust (93) & Transfer (94/95) */}
+                    {/* Actions: Adjust (93) */}
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         {hasPermission('stock', 'edit') && (
-                          <>
-                            <button
-                              onClick={() => {
-                                setTransferItem(s);
-                                setToStoreId(s.storeId === 1 ? 2 : 1);
-                                setTransferQty('1');
-                                setTransferNote('');
-                                setShowTransferModal(true);
-                              }}
-                              title="Transférer vers l'autre boutique (94/95)"
-                              className="p-1.5 bg-blue-600/20 text-blue-300 hover:bg-blue-600/30 border border-blue-500/30 rounded-lg text-xs font-semibold flex items-center gap-1"
-                            >
-                              <ArrowRightLeft className="w-3.5 h-3.5" />
-                              <span className="hidden xl:inline">{isAr ? 'تحويل' : 'Transfert'}</span>
-                            </button>
-
-                            <button
-                              onClick={() => {
-                                setAdjustItem(s);
-                                setAdjustNewQty(s.quantity.toString());
-                                setAdjustNote('');
-                                setShowAdjustModal(true);
-                              }}
-                              title="Ajustement manuel de stock (93)"
-                              className="p-1.5 bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 border border-purple-500/30 rounded-lg text-xs font-semibold flex items-center gap-1"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                              <span className="hidden xl:inline">{isAr ? 'تعديل' : 'Ajuster'}</span>
-                            </button>
-                          </>
+                          <button
+                            onClick={() => {
+                              setAdjustItem(s);
+                              setAdjustNewQty(s.quantity.toString());
+                              setAdjustNote('');
+                              setShowAdjustModal(true);
+                            }}
+                            title="Ajustement manuel de stock (93)"
+                            className="p-1.5 bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 border border-purple-500/30 rounded-lg text-xs font-semibold flex items-center gap-1"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span className="hidden xl:inline">{isAr ? 'تعديل' : 'Ajuster'}</span>
+                          </button>
                         )}
                       </div>
                     </td>
@@ -460,83 +417,6 @@ export const StockPage: React.FC = () => {
         </div>
       )}
 
-      {/* Modal: Inter-Store Transfer (94 & 95) */}
-      {showTransferModal && transferItem && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 text-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-black text-white flex items-center gap-2">
-                <ArrowRightLeft className="w-5 h-5 text-blue-400" />
-                <span>{isAr ? 'تحويل بين المتاجر (94 / 95)' : 'Transfert Inter-Boutique (94 / 95)'}</span>
-              </h3>
-              <button onClick={() => setShowTransferModal(false)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="bg-slate-800/80 p-3.5 rounded-2xl text-xs space-y-1 border border-slate-700">
-              <div className="font-bold text-white">{transferItem.productName}</div>
-              <div className="text-slate-400">
-                {isAr ? 'الرمز :' : 'Réf :'} {transferItem.productCode} • {isAr ? 'المتاح في المحل المصدر :' : 'Dispo source :'} <b className="text-emerald-400">{transferItem.quantity} {isAr ? 'وحدة' : 'unités'}</b>
-              </div>
-            </div>
-
-            <form onSubmit={handleExecuteTransfer} className="space-y-4">
-              <div>
-                <label className="text-[11px] font-semibold text-slate-300">{isAr ? 'المحل الوجهة' : 'Boutique Destination'}</label>
-                <select
-                  value={toStoreId}
-                  onChange={e => setToStoreId(parseInt(e.target.value, 10))}
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none"
-                >
-                  <option value={1}>Boutique 1 (Centre-Ville)</option>
-                  <option value={2}>Boutique 2 (Zone Industrielle / Dépôt)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-slate-300">{isAr ? 'الكمية المحولة' : 'Quantité à Transférer'}</label>
-                <input
-                  type="number"
-                  min="1"
-                  max={transferItem.quantity}
-                  required
-                  value={transferQty}
-                  onChange={e => setTransferQty(e.target.value)}
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-base font-black text-center text-blue-400 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-slate-300">{isAr ? 'ملاحظة التحويل' : 'Motif / Note de transfert'}</label>
-                <input
-                  type="text"
-                  placeholder={isAr ? 'مثال: تعزيز عاجل للمحل 2' : 'Ex: Réassort urgent boutique 2'}
-                  value={transferNote}
-                  onChange={e => setTransferNote(e.target.value)}
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs outline-none text-white"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowTransferModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white rounded-xl"
-                >
-                  {isAr ? 'إلغاء' : 'Annuler'}
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs shadow-md"
-                >
-                  {isAr ? 'تأكيد التحويل' : 'Confirmer le Transfert'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Modal: Manual Stock Adjustment (Code 93) */}
       {showAdjustModal && adjustItem && (
