@@ -15,7 +15,40 @@ router.post('/push', (req, res) => {
   }
 
   try {
-    const { storeId, sales, returns, purchases, stockMovements, clientTransactions, supplierTransactions, stockTransfers, depenses } = payload || {};
+    const { storeId = 1, sales, returns, purchases, stockMovements, clientTransactions, supplierTransactions, stockTransfers, depenses } = payload || {};
+
+    const validStoreId = Number(storeId) || 1;
+
+    // Helper functions for safe foreign keys
+    const getSafeUserId = (uid: any): number => {
+      if (!uid) return 1;
+      const row = rawDb.prepare('SELECT id FROM users WHERE id = ?').get(Number(uid));
+      return row ? Number(uid) : 1;
+    };
+
+    const getSafeClientId = (cid: any): number | null => {
+      if (!cid) return null;
+      const row = rawDb.prepare('SELECT id FROM clients WHERE id = ?').get(Number(cid));
+      return row ? Number(cid) : null;
+    };
+
+    const getSafeSupplierId = (sid: any): number | null => {
+      if (!sid) return null;
+      const row = rawDb.prepare('SELECT id FROM suppliers WHERE id = ?').get(Number(sid));
+      return row ? Number(sid) : null;
+    };
+
+    const getSafeProductId = (pid: any): number => {
+      if (!pid) return 1;
+      const row = rawDb.prepare('SELECT id FROM products WHERE id = ?').get(Number(pid));
+      return row ? Number(pid) : 1;
+    };
+
+    const getSafeCategoryId = (catId: any): number => {
+      if (!catId) return 1;
+      const row = rawDb.prepare('SELECT id FROM expense_categories WHERE id = ?').get(Number(catId));
+      return row ? Number(catId) : 1;
+    };
 
     // Temporarily relax foreign keys during sync upsert so offline store records sync cleanly
     rawDb.pragma('foreign_keys = OFF');
@@ -24,7 +57,7 @@ router.post('/push', (req, res) => {
     if (sales && sales.length > 0) {
       const insertSale = rawDb.prepare(`
         INSERT INTO sales (id, store_id, client_id, user_id, cash_session_id, subtotal, discount, total, amount_paid, amount_credit, payment_type, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           subtotal = excluded.subtotal,
           discount = excluded.discount,
@@ -42,38 +75,45 @@ router.post('/push', (req, res) => {
       for (const item of sales) {
         try {
           const s = item as any;
+          const safeUser = getSafeUserId(s.userId || s.user_id);
+          const safeClient = getSafeClientId(s.clientId || s.client_id);
+
           insertSale.run(
-            s.id,
-            s.storeId || s.store_id || storeId || 1,
-            s.clientId || s.client_id || null,
-            s.userId || s.user_id || 1,
-            s.cashSessionId || s.cash_session_id || null,
-            s.subtotal || s.total,
-            s.discount || 0,
-            s.total,
-            s.amountPaid || s.amount_paid || s.total,
-            s.amountCredit || s.amount_credit || 0,
-            s.paymentType || s.payment_type || 'cash',
-            s.status || 'completed',
-            s.createdAt || s.created_at || new Date().toISOString()
+            Number(s.id),
+            Number(s.storeId || s.store_id || validStoreId),
+            safeClient,
+            safeUser,
+            Number(s.subtotal || s.total || 0),
+            Number(s.discount || 0),
+            Number(s.total || 0),
+            Number(s.amountPaid || s.amount_paid || s.total || 0),
+            Number(s.amountCredit || s.amount_credit || 0),
+            String(s.paymentType || s.payment_type || 'cash'),
+            String(s.status || 'completed'),
+            String(s.createdAt || s.created_at || new Date().toISOString())
           );
 
           if (s.items && Array.isArray(s.items) && s.items.length > 0) {
-            rawDb.prepare('DELETE FROM sale_items WHERE sale_id = ?').run(s.id);
+            rawDb.prepare('DELETE FROM sale_items WHERE sale_id = ?').run(Number(s.id));
             for (const rawIt of s.items) {
               const it = rawIt as any;
+              const safeProd = getSafeProductId(it.productId || it.product_id);
+              const qty = Number(it.qty || 1);
+              const unitPrice = Number(it.unitPrice || it.unit_price || 0);
+              const lineTotal = Number(it.lineTotal || it.line_total || (qty * unitPrice));
+
               insertSaleItem.run(
-                s.id,
-                it.productId || it.product_id || 1,
-                it.priceTier || it.price_tier || 'detail',
-                it.qty || 1,
-                it.unitPrice || it.unit_price || 0,
-                it.lineTotal || it.line_total || ((it.qty || 1) * (it.unitPrice || it.unit_price || 0))
+                Number(s.id),
+                safeProd,
+                String(it.priceTier || it.price_tier || 'detail'),
+                qty,
+                unitPrice,
+                lineTotal
               );
             }
           }
         } catch (sErr: any) {
-          console.warn('Sync sale warning:', sErr.message);
+          console.error('Error inserting synced sale:', sErr);
         }
       }
     }
@@ -87,7 +127,14 @@ router.post('/push', (req, res) => {
       for (const rawR of returns) {
         try {
           const r = rawR as any;
-          insertReturn.run(r.id, r.saleId || r.sale_id, storeId, r.userId || r.user_id || 1, r.totalRefund || r.total_refund, r.createdAt || r.created_at || new Date().toISOString());
+          insertReturn.run(
+            Number(r.id),
+            Number(r.saleId || r.sale_id),
+            validStoreId,
+            getSafeUserId(r.userId || r.user_id),
+            Number(r.totalRefund || r.total_refund || 0),
+            String(r.createdAt || r.created_at || new Date().toISOString())
+          );
         } catch {}
       }
     }
@@ -101,7 +148,16 @@ router.post('/push', (req, res) => {
       for (const rawP of purchases) {
         try {
           const p = rawP as any;
-          insertPurchase.run(p.id, storeId, p.supplierId || p.supplier_id || null, p.userId || p.user_id || 1, p.total, p.amountPaid || p.amount_paid || p.total, p.paymentType || p.payment_type || 'cash', p.createdAt || p.created_at || new Date().toISOString());
+          insertPurchase.run(
+            Number(p.id),
+            validStoreId,
+            getSafeSupplierId(p.supplierId || p.supplier_id),
+            getSafeUserId(p.userId || p.user_id),
+            Number(p.total || 0),
+            Number(p.amountPaid || p.amount_paid || p.total || 0),
+            String(p.paymentType || p.payment_type || 'cash'),
+            String(p.createdAt || p.created_at || new Date().toISOString())
+          );
         } catch {}
       }
     }
@@ -116,17 +172,17 @@ router.post('/push', (req, res) => {
         try {
           const sm = rawSm as any;
           insertMovement.run(
-            sm.id,
-            sm.productId || sm.product_id,
-            storeId,
-            sm.movementCode || sm.movement_code,
-            sm.qtyBefore !== undefined ? sm.qtyBefore : (sm.qty_before || 0),
-            sm.qtyAfter !== undefined ? sm.qtyAfter : (sm.qty_after || 0),
-            sm.delta,
-            sm.userId || sm.user_id || 1,
+            Number(sm.id),
+            getSafeProductId(sm.productId || sm.product_id),
+            validStoreId,
+            Number(sm.movementCode || sm.movement_code || 91),
+            Number(sm.qtyBefore !== undefined ? sm.qtyBefore : (sm.qty_before || 0)),
+            Number(sm.qtyAfter !== undefined ? sm.qtyAfter : (sm.qty_after || 0)),
+            Number(sm.delta || 0),
+            getSafeUserId(sm.userId || sm.user_id),
             sm.refType || sm.ref_type || null,
             sm.refId || sm.ref_id || null,
-            sm.createdAt || sm.created_at || new Date().toISOString()
+            String(sm.createdAt || sm.created_at || new Date().toISOString())
           );
         } catch {}
       }
@@ -141,7 +197,17 @@ router.post('/push', (req, res) => {
       for (const rawTx of clientTransactions) {
         try {
           const tx = rawTx as any;
-          insertTx.run(tx.id, tx.clientId || tx.client_id, tx.type, tx.amount, tx.note || null, tx.createdAt || tx.created_at || new Date().toISOString());
+          const safeC = getSafeClientId(tx.clientId || tx.client_id);
+          if (safeC) {
+            insertTx.run(
+              Number(tx.id),
+              safeC,
+              String(tx.type || 'achat'),
+              Number(tx.amount || 0),
+              tx.note || null,
+              String(tx.createdAt || tx.created_at || new Date().toISOString())
+            );
+          }
         } catch {}
       }
     }
@@ -155,7 +221,17 @@ router.post('/push', (req, res) => {
       for (const rawTx of supplierTransactions) {
         try {
           const tx = rawTx as any;
-          insertTx.run(tx.id, tx.supplierId || tx.supplier_id, tx.type, tx.amount, tx.note || null, tx.createdAt || tx.created_at || new Date().toISOString());
+          const safeS = getSafeSupplierId(tx.supplierId || tx.supplier_id);
+          if (safeS) {
+            insertTx.run(
+              Number(tx.id),
+              safeS,
+              String(tx.type || 'achat'),
+              Number(tx.amount || 0),
+              tx.note || null,
+              String(tx.createdAt || tx.created_at || new Date().toISOString())
+            );
+          }
         } catch {}
       }
     }
@@ -169,7 +245,17 @@ router.post('/push', (req, res) => {
       for (const rawSt of stockTransfers) {
         try {
           const st = rawSt as any;
-          insertTransfer.run(st.id, st.fromStoreId || st.from_store_id, st.toStoreId || st.to_store_id, st.productId || st.product_id, st.qty, st.userId || st.user_id || 1, st.note || null, st.status || 'completed', st.createdAt || st.created_at || new Date().toISOString());
+          insertTransfer.run(
+            Number(st.id),
+            Number(st.fromStoreId || st.from_store_id || 1),
+            Number(st.toStoreId || st.to_store_id || 2),
+            getSafeProductId(st.productId || st.product_id),
+            Number(st.qty || 0),
+            getSafeUserId(st.userId || st.user_id),
+            st.note || null,
+            String(st.status || 'completed'),
+            String(st.createdAt || st.created_at || new Date().toISOString())
+          );
         } catch {}
       }
     }
@@ -184,14 +270,14 @@ router.post('/push', (req, res) => {
         try {
           const d = rawD as any;
           insertDep.run(
-            d.id,
-            storeId,
-            d.categoryId || d.category_id,
-            d.amount,
+            Number(d.id),
+            validStoreId,
+            getSafeCategoryId(d.categoryId || d.category_id),
+            Number(d.amount || 0),
             d.note || null,
-            d.userId || d.user_id || 1,
-            d.depenseDate || d.depense_date || d.createdAt || d.created_at,
-            d.createdAt || d.created_at || new Date().toISOString()
+            getSafeUserId(d.userId || d.user_id),
+            String(d.depenseDate || d.depense_date || d.createdAt || d.created_at || new Date().toISOString().slice(0, 10)),
+            String(d.createdAt || d.created_at || new Date().toISOString())
           );
         } catch {}
       }
@@ -207,10 +293,10 @@ router.post('/push', (req, res) => {
       for (const rawSm of stockMovements) {
         try {
           const sm = rawSm as any;
-          const pId = sm.productId || sm.product_id;
+          const pId = getSafeProductId(sm.productId || sm.product_id);
           const qAfter = sm.qtyAfter !== undefined ? sm.qtyAfter : sm.qty_after;
           if (pId && qAfter !== undefined) {
-            updateStock.run(pId, storeId, qAfter);
+            updateStock.run(pId, validStoreId, Number(qAfter));
           }
         } catch {}
       }
