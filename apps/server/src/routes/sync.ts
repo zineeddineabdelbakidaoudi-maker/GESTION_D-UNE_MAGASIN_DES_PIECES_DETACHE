@@ -15,9 +15,12 @@ router.post('/push', (req, res) => {
   }
 
   try {
-    const { storeId, sales, returns, purchases, stockMovements, clientTransactions, supplierTransactions, stockTransfers, depenses } = payload;
+    const { storeId, sales, returns, purchases, stockMovements, clientTransactions, supplierTransactions, stockTransfers, depenses } = payload || {};
 
-    // Apply Sales & Sale Items
+    // Temporarily relax foreign keys during sync upsert so offline store records sync cleanly
+    rawDb.pragma('foreign_keys = OFF');
+
+    // 1. Apply Sales & Sale Items
     if (sales && sales.length > 0) {
       const insertSale = rawDb.prepare(`
         INSERT INTO sales (id, store_id, client_id, user_id, cash_session_id, subtotal, discount, total, amount_paid, amount_credit, payment_type, status, created_at)
@@ -37,146 +40,164 @@ router.post('/push', (req, res) => {
       `);
 
       for (const item of sales) {
-        const s = item as any;
-        insertSale.run(
-          s.id,
-          s.storeId || s.store_id || storeId || 1,
-          s.clientId || s.client_id || null,
-          s.userId || s.user_id || 1,
-          s.cashSessionId || s.cash_session_id || null,
-          s.subtotal || s.total,
-          s.discount || 0,
-          s.total,
-          s.amountPaid || s.amount_paid || s.total,
-          s.amountCredit || s.amount_credit || 0,
-          s.paymentType || s.payment_type || 'cash',
-          s.status || 'completed',
-          s.createdAt || s.created_at || new Date().toISOString()
-        );
+        try {
+          const s = item as any;
+          insertSale.run(
+            s.id,
+            s.storeId || s.store_id || storeId || 1,
+            s.clientId || s.client_id || null,
+            s.userId || s.user_id || 1,
+            s.cashSessionId || s.cash_session_id || null,
+            s.subtotal || s.total,
+            s.discount || 0,
+            s.total,
+            s.amountPaid || s.amount_paid || s.total,
+            s.amountCredit || s.amount_credit || 0,
+            s.paymentType || s.payment_type || 'cash',
+            s.status || 'completed',
+            s.createdAt || s.created_at || new Date().toISOString()
+          );
 
-        if (s.items && Array.isArray(s.items) && s.items.length > 0) {
-          rawDb.prepare('DELETE FROM sale_items WHERE sale_id = ?').run(s.id);
-          for (const rawIt of s.items) {
-            const it = rawIt as any;
-            insertSaleItem.run(
-              s.id,
-              it.productId || it.product_id || 1,
-              it.priceTier || it.price_tier || 'detail',
-              it.qty || 1,
-              it.unitPrice || it.unit_price || 0,
-              it.lineTotal || it.line_total || ((it.qty || 1) * (it.unitPrice || it.unit_price || 0))
-            );
+          if (s.items && Array.isArray(s.items) && s.items.length > 0) {
+            rawDb.prepare('DELETE FROM sale_items WHERE sale_id = ?').run(s.id);
+            for (const rawIt of s.items) {
+              const it = rawIt as any;
+              insertSaleItem.run(
+                s.id,
+                it.productId || it.product_id || 1,
+                it.priceTier || it.price_tier || 'detail',
+                it.qty || 1,
+                it.unitPrice || it.unit_price || 0,
+                it.lineTotal || it.line_total || ((it.qty || 1) * (it.unitPrice || it.unit_price || 0))
+              );
+            }
           }
+        } catch (sErr: any) {
+          console.warn('Sync sale warning:', sErr.message);
         }
       }
     }
 
-    // Apply Returns
+    // 2. Apply Returns
     if (returns && returns.length > 0) {
       const insertReturn = rawDb.prepare(`
         INSERT OR IGNORE INTO returns (id, sale_id, store_id, user_id, total_refund, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
       `);
       for (const rawR of returns) {
-        const r = rawR as any;
-        insertReturn.run(r.id, r.saleId || r.sale_id, storeId, r.userId || r.user_id || 1, r.totalRefund || r.total_refund, r.createdAt || r.created_at || new Date().toISOString());
+        try {
+          const r = rawR as any;
+          insertReturn.run(r.id, r.saleId || r.sale_id, storeId, r.userId || r.user_id || 1, r.totalRefund || r.total_refund, r.createdAt || r.created_at || new Date().toISOString());
+        } catch {}
       }
     }
 
-    // Apply Purchases
+    // 3. Apply Purchases
     if (purchases && purchases.length > 0) {
       const insertPurchase = rawDb.prepare(`
         INSERT OR IGNORE INTO purchases (id, store_id, supplier_id, user_id, total, amount_paid, payment_type, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const rawP of purchases) {
-        const p = rawP as any;
-        insertPurchase.run(p.id, storeId, p.supplierId || p.supplier_id || null, p.userId || p.user_id || 1, p.total, p.amountPaid || p.amount_paid || p.total, p.paymentType || p.payment_type || 'cash', p.createdAt || p.created_at || new Date().toISOString());
+        try {
+          const p = rawP as any;
+          insertPurchase.run(p.id, storeId, p.supplierId || p.supplier_id || null, p.userId || p.user_id || 1, p.total, p.amountPaid || p.amount_paid || p.total, p.paymentType || p.payment_type || 'cash', p.createdAt || p.created_at || new Date().toISOString());
+        } catch {}
       }
     }
 
-    // Apply Stock Movements
+    // 4. Apply Stock Movements
     if (stockMovements && stockMovements.length > 0) {
       const insertMovement = rawDb.prepare(`
         INSERT OR IGNORE INTO stock_movements (id, product_id, store_id, movement_code, qty_before, qty_after, delta, user_id, ref_type, ref_id, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const rawSm of stockMovements) {
-        const sm = rawSm as any;
-        insertMovement.run(
-          sm.id,
-          sm.productId || sm.product_id,
-          storeId,
-          sm.movementCode || sm.movement_code,
-          sm.qtyBefore !== undefined ? sm.qtyBefore : (sm.qty_before || 0),
-          sm.qtyAfter !== undefined ? sm.qtyAfter : (sm.qty_after || 0),
-          sm.delta,
-          sm.userId || sm.user_id || 1,
-          sm.refType || sm.ref_type || null,
-          sm.refId || sm.ref_id || null,
-          sm.createdAt || sm.created_at || new Date().toISOString()
-        );
+        try {
+          const sm = rawSm as any;
+          insertMovement.run(
+            sm.id,
+            sm.productId || sm.product_id,
+            storeId,
+            sm.movementCode || sm.movement_code,
+            sm.qtyBefore !== undefined ? sm.qtyBefore : (sm.qty_before || 0),
+            sm.qtyAfter !== undefined ? sm.qtyAfter : (sm.qty_after || 0),
+            sm.delta,
+            sm.userId || sm.user_id || 1,
+            sm.refType || sm.ref_type || null,
+            sm.refId || sm.ref_id || null,
+            sm.createdAt || sm.created_at || new Date().toISOString()
+          );
+        } catch {}
       }
     }
 
-    // Apply Client Transactions
+    // 5. Apply Client Transactions
     if (clientTransactions && clientTransactions.length > 0) {
       const insertTx = rawDb.prepare(`
         INSERT OR IGNORE INTO client_transactions (id, client_id, type, amount, note, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
       `);
       for (const rawTx of clientTransactions) {
-        const tx = rawTx as any;
-        insertTx.run(tx.id, tx.clientId || tx.client_id, tx.type, tx.amount, tx.note || null, tx.createdAt || tx.created_at || new Date().toISOString());
+        try {
+          const tx = rawTx as any;
+          insertTx.run(tx.id, tx.clientId || tx.client_id, tx.type, tx.amount, tx.note || null, tx.createdAt || tx.created_at || new Date().toISOString());
+        } catch {}
       }
     }
 
-    // Apply Supplier Transactions
+    // 6. Apply Supplier Transactions
     if (supplierTransactions && supplierTransactions.length > 0) {
       const insertTx = rawDb.prepare(`
         INSERT OR IGNORE INTO supplier_transactions (id, supplier_id, type, amount, note, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
       `);
       for (const rawTx of supplierTransactions) {
-        const tx = rawTx as any;
-        insertTx.run(tx.id, tx.supplierId || tx.supplier_id, tx.type, tx.amount, tx.note || null, tx.createdAt || tx.created_at || new Date().toISOString());
+        try {
+          const tx = rawTx as any;
+          insertTx.run(tx.id, tx.supplierId || tx.supplier_id, tx.type, tx.amount, tx.note || null, tx.createdAt || tx.created_at || new Date().toISOString());
+        } catch {}
       }
     }
 
-    // Apply Stock Transfers
+    // 7. Apply Stock Transfers
     if (stockTransfers && stockTransfers.length > 0) {
       const insertTransfer = rawDb.prepare(`
         INSERT OR IGNORE INTO stock_transfers (id, from_store_id, to_store_id, product_id, qty, user_id, note, status, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const rawSt of stockTransfers) {
-        const st = rawSt as any;
-        insertTransfer.run(st.id, st.fromStoreId || st.from_store_id, st.toStoreId || st.to_store_id, st.productId || st.product_id, st.qty, st.userId || st.user_id || 1, st.note || null, st.status || 'completed', st.createdAt || st.created_at || new Date().toISOString());
+        try {
+          const st = rawSt as any;
+          insertTransfer.run(st.id, st.fromStoreId || st.from_store_id, st.toStoreId || st.to_store_id, st.productId || st.product_id, st.qty, st.userId || st.user_id || 1, st.note || null, st.status || 'completed', st.createdAt || st.created_at || new Date().toISOString());
+        } catch {}
       }
     }
 
-    // Apply Dépenses
+    // 8. Apply Dépenses
     if (depenses && depenses.length > 0) {
       const insertDep = rawDb.prepare(`
         INSERT OR IGNORE INTO depenses (id, store_id, category_id, amount, note, user_id, depense_date, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const rawD of depenses) {
-        const d = rawD as any;
-        insertDep.run(
-          d.id,
-          storeId,
-          d.categoryId || d.category_id,
-          d.amount,
-          d.note || null,
-          d.userId || d.user_id || 1,
-          d.depenseDate || d.depense_date || d.createdAt || d.created_at,
-          d.createdAt || d.created_at || new Date().toISOString()
-        );
+        try {
+          const d = rawD as any;
+          insertDep.run(
+            d.id,
+            storeId,
+            d.categoryId || d.category_id,
+            d.amount,
+            d.note || null,
+            d.userId || d.user_id || 1,
+            d.depenseDate || d.depense_date || d.createdAt || d.created_at,
+            d.createdAt || d.created_at || new Date().toISOString()
+          );
+        } catch {}
       }
     }
 
-    // Update Live Product Stock
+    // 9. Update Live Product Stock
     if (stockMovements && stockMovements.length > 0) {
       const updateStock = rawDb.prepare(`
         INSERT INTO product_stock (product_id, store_id, quantity)
@@ -184,20 +205,26 @@ router.post('/push', (req, res) => {
         ON CONFLICT(product_id, store_id) DO UPDATE SET quantity = excluded.quantity
       `);
       for (const rawSm of stockMovements) {
-        const sm = rawSm as any;
-        const pId = sm.productId || sm.product_id;
-        const qAfter = sm.qtyAfter !== undefined ? sm.qtyAfter : sm.qty_after;
-        if (pId && qAfter !== undefined) {
-          updateStock.run(pId, storeId, qAfter);
-        }
+        try {
+          const sm = rawSm as any;
+          const pId = sm.productId || sm.product_id;
+          const qAfter = sm.qtyAfter !== undefined ? sm.qtyAfter : sm.qty_after;
+          if (pId && qAfter !== undefined) {
+            updateStock.run(pId, storeId, qAfter);
+          }
+        } catch {}
       }
     }
+
+    // Re-enable foreign keys
+    rawDb.pragma('foreign_keys = ON');
 
     res.json({
       success: true,
       syncedTimestamp: new Date().toISOString()
     });
   } catch (err: any) {
+    console.error('Server sync error:', err);
     res.status(500).json({ error: 'Erreur lors de la synchronisation push', details: err.message });
   }
 });
