@@ -379,6 +379,17 @@ function initLocalSchema(db: Database.Database) {
   try { db.exec(`ALTER TABLE products ADD COLUMN unit TEXT NOT NULL DEFAULT 'PCS'`); } catch {}
   try { db.exec(`ALTER TABLE sale_items ADD COLUMN unit_cost_snapshot INTEGER NOT NULL DEFAULT 0`); } catch {}
   try { db.exec(`CREATE TABLE IF NOT EXISTS saved_locations (id INTEGER PRIMARY KEY AUTOINCREMENT, location TEXT NOT NULL UNIQUE)`); } catch {}
+  // Backfill unit_cost_snapshot for existing sale_items that have 0 (old data before this column existed)
+  // Use the product's current price_achat as best approximation
+  try {
+    db.exec(`
+      UPDATE sale_items
+      SET unit_cost_snapshot = (
+        SELECT p.price_achat FROM products p WHERE p.id = sale_items.product_id
+      )
+      WHERE unit_cost_snapshot = 0 AND product_id IS NOT NULL
+    `);
+  } catch {}
 
   // Ensure rich realistic products are available for testing
   seedRealProductsIfMissing(db);

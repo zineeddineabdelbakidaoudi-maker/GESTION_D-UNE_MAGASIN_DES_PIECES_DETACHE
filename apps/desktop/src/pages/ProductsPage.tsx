@@ -204,6 +204,7 @@ export const ProductsPage: React.FC = () => {
         priceGros: pGros,
         location: location.toUpperCase().trim(),
         unit: unit || 'PCS',
+        photoBase64: photoBase64 || null,
         colorMode: 'single',
         colorIds: selectedColorId ? [Number(selectedColorId)] : [],
         mergeColorIds: [],

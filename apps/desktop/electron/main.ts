@@ -172,10 +172,10 @@ function registerIpcHandlers() {
     }
 
     const insertProd = db.prepare(`
-      INSERT INTO products (id, code, name, category_id, brand_id, price_achat, price_detail, price_semi_gros, price_gros, color_mode, location, unit)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO products (id, code, name, category_id, brand_id, price_achat, price_detail, price_semi_gros, price_gros, color_mode, location, unit, photo_base64)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    insertProd.run(nextId, code, payload.name, payload.categoryId || null, payload.brandId || null, payload.priceAchat, payload.priceDetail, payload.priceSemiGros, payload.priceGros, payload.colorMode, payload.location || '', payload.unit || 'PCS');
+    insertProd.run(nextId, code, payload.name, payload.categoryId || null, payload.brandId || null, payload.priceAchat, payload.priceDetail, payload.priceSemiGros, payload.priceGros, payload.colorMode, payload.location || '', payload.unit || 'PCS', payload.photoBase64 || null);
 
     // Auto-save location to saved_locations for future dropdown
     if (payload.location && payload.location.trim()) {
@@ -272,6 +272,11 @@ function registerIpcHandlers() {
     // Auto-save the location to saved_locations for future use
     if (location && location.trim()) {
       try { db.prepare('INSERT OR IGNORE INTO saved_locations (location) VALUES (?)').run(location.trim()); } catch {}
+    }
+
+    // Save photo if provided
+    if (payload.photoBase64) {
+      db.prepare('UPDATE products SET photo_base64 = ? WHERE id = ?').run(payload.photoBase64, id);
     }
 
     return { success: true, id, finalPriceAchat };

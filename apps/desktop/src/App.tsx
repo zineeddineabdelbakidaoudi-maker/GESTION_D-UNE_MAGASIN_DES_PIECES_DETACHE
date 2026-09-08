@@ -29,36 +29,44 @@ export const App: React.FC = () => {
     }
   }, [isDark]);
 
-  // Global Keyboard Shortcuts handler
-  const handleGlobalShortcut = useCallback(async (e: KeyboardEvent) => {
-    // Don't trigger shortcuts when typing in an input, textarea, or select
-    const tag = (e.target as HTMLElement)?.tagName;
+  // Load shortcuts once on mount, cache in ref to avoid calling IPC on every keypress
+  const shortcutsRef = React.useRef<Record<string, string>>({});
+  useEffect(() => {
+    invokeIpc<Record<string, string>>('get-shortcuts').then(sc => {
+      if (sc) shortcutsRef.current = sc;
+    }).catch(() => {});
+  }, []);
+
+  // Global Keyboard Shortcuts handler — uses cached shortcuts, no IPC call on every key
+  const handleGlobalShortcut = useCallback((e: KeyboardEvent) => {
+    // Don't trigger shortcuts when typing in an input, textarea, select, or contenteditable
+    const target = e.target as HTMLElement;
+    const tag = target?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (target?.isContentEditable) return;
 
-    try {
-      const shortcuts = await invokeIpc<Record<string, string>>('get-shortcuts');
-      if (!shortcuts) return;
+    const shortcuts = shortcutsRef.current;
+    if (!shortcuts || Object.keys(shortcuts).length === 0) return;
 
-      const pressed = [
-        e.ctrlKey && 'Control',
-        e.shiftKey && 'Shift',
-        e.altKey && 'Alt',
-        e.key !== 'Control' && e.key !== 'Shift' && e.key !== 'Alt' && e.key
-      ].filter(Boolean).join('+');
+    const pressed = [
+      e.ctrlKey && 'Control',
+      e.shiftKey && 'Shift',
+      e.altKey && 'Alt',
+      e.key !== 'Control' && e.key !== 'Shift' && e.key !== 'Alt' && e.key
+    ].filter(Boolean).join('+');
 
-      const action = Object.entries(shortcuts).find(([_, sc]) => sc === pressed)?.[0];
-      if (!action) return;
+    const action = Object.entries(shortcuts).find(([_, sc]) => sc === pressed)?.[0];
+    if (!action) return;
 
-      const navMap: Record<string, string> = {
-        goto_pos: 'pos', goto_produits: 'produits', goto_stock: 'stock',
-        goto_achat: 'achat', goto_clients: 'clients', goto_fournisseurs: 'fournisseurs',
-        goto_rapport: 'rapport', goto_depenses: 'depenses', goto_settings: 'settings'
-      };
-      if (navMap[action]) {
-        e.preventDefault();
-        setActiveTab(navMap[action]);
-      }
-    } catch {}
+    const navMap: Record<string, string> = {
+      goto_pos: 'pos', goto_produits: 'produits', goto_stock: 'stock',
+      goto_achat: 'achat', goto_clients: 'clients', goto_fournisseurs: 'fournisseurs',
+      goto_rapport: 'rapport', goto_depenses: 'depenses', goto_settings: 'settings'
+    };
+    if (navMap[action]) {
+      e.preventDefault();
+      setActiveTab(navMap[action]);
+    }
   }, [setActiveTab]);
 
   useEffect(() => {
