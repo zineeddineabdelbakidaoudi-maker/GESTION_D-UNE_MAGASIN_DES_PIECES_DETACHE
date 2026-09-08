@@ -904,10 +904,10 @@ export const ProductsPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Section 3: Colors (Single selection, enabled for Carénage/Accessoire) */}
-              <div className="space-y-3 p-4 rounded-2xl border transition-all ${
+              {/* Section 3: Colors (Single selection, enabled for Casque/Carénage) */}
+              <div className={`space-y-3 p-4 rounded-2xl border transition-all ${
                 isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
-              }">
+              }`}>
                 <div className="flex items-center justify-between">
                   <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
                     isDark ? 'text-slate-300' : 'text-slate-700'
@@ -929,7 +929,7 @@ export const ProductsPage: React.FC = () => {
 
                 {!isColorEligible ? (
                   <div className="p-3 rounded-xl border border-dashed border-amber-600/40 bg-amber-500/10 text-amber-300 text-xs flex items-center gap-2">
-                    <span>🔒 {isAr ? 'حقل اللون مفعل فقط لأصناف الكاريناج والإكسسوارات' : 'Choix de couleur bloqué — Activé uniquement pour les catégories Carénage et Accessoires.'}</span>
+                    <span>🔒 {isAr ? 'حقل اللون مفعل فقط لأصناف الخوذات والكاريناج' : 'Choix de couleur bloqué — Activé uniquement pour les catégories Casques et Carénages.'}</span>
                   </div>
                 ) : null}
 

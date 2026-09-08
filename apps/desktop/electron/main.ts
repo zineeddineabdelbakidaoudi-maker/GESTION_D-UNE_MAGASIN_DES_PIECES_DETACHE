@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 // @ts-ignore
 import bwipjs from 'bwip-js';
@@ -34,9 +34,23 @@ function createWindow() {
   }
 }
 
+process.on('uncaughtException', (error) => {
+  console.error('[CRITICAL MAIN EXCEPTION]:', error);
+  dialog.showErrorBox('Erreur Interne (Main Process)', error.stack || error.message);
+});
+
+process.on('unhandledRejection', (reason: any) => {
+  console.error('[UNHANDLED REJECTION]:', reason);
+});
+
 app.whenReady().then(() => {
+  try {
+    registerIpcHandlers();
+  } catch (err: any) {
+    console.error('Failed to register IPC handlers:', err);
+    dialog.showErrorBox('Erreur IPC', 'Échec de l\'enregistrement des handlers: ' + (err.stack || err.message));
+  }
   createWindow();
-  registerIpcHandlers();
 });
 
 app.on('window-all-closed', () => {
@@ -824,28 +838,6 @@ function registerIpcHandlers() {
       { name: 'Xprinter XP-N160I (LAN)', displayName: 'Xprinter XP-N160I (LAN)', isDefault: false, type: 'thermal' },
       { name: 'Microsoft Print to PDF', displayName: 'Microsoft Print to PDF', isDefault: false, type: 'virtual' }
     ];
-  });
-
-  ipcMain.handle('print-receipt', (_event, payload: any) => {
-    const { sale, store, settings, cashierName } = payload || {};
-    const total = (sale?.total || 0) / 100;
-    const receiptText = `
-================================================
-          ${settings?.storeName || store?.name || 'PIECES CYCLES & MOTOS'}
-          ${settings?.address || store?.address || 'Alger'}
-          Tél: ${settings?.phone || store?.phone || ''}
-================================================
-TICKET N°: ${String(sale?.id || 1).padStart(6, '0')}
-DATE: ${new Date().toLocaleDateString('fr-DZ')} ${new Date().toLocaleTimeString('fr-DZ')}
-CAISSIER: ${cashierName || 'Vendeur'}
-------------------------------------------------
-TOTAL GENERAL: ${total.toFixed(2)} DA
-MODE PAIEMENT: ${(sale?.paymentType || 'CASH').toUpperCase()}
-------------------------------------------------
-${settings?.receiptFooter || 'Merci pour votre confiance !'}
-================================================
-    `.trim();
-    return { success: true, receiptText };
   });
 
   // Dépenses (Expenses)

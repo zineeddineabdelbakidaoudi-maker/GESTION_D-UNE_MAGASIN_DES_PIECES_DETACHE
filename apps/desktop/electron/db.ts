@@ -371,7 +371,10 @@ function initLocalSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_depenses_store_date ON depenses(store_id, depense_date);
   `);
 
-  // Migrate existing DBs: add new columns if they don't exist
+  // Migrate existing DBs: add new columns and tables if they don't exist
+  try { db.exec(`CREATE TABLE IF NOT EXISTS expense_categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)`); } catch {}
+  try { db.exec(`CREATE TABLE IF NOT EXISTS depenses (id INTEGER PRIMARY KEY AUTOINCREMENT, store_id INTEGER NOT NULL, category_id INTEGER NOT NULL, amount INTEGER NOT NULL, note TEXT DEFAULT '', user_id INTEGER NOT NULL, depense_date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`); } catch {}
+  try { db.exec(`CREATE TABLE IF NOT EXISTS keyboard_shortcuts (action TEXT PRIMARY KEY, shortcut TEXT NOT NULL)`); } catch {}
   try { db.exec(`ALTER TABLE products ADD COLUMN location TEXT NOT NULL DEFAULT ''`); } catch {}
   try { db.exec(`ALTER TABLE settings ADD COLUMN avg_price_mode INTEGER NOT NULL DEFAULT 1`); } catch {}
   try { db.exec(`ALTER TABLE products ADD COLUMN photo_base64 TEXT DEFAULT NULL`); } catch {}
