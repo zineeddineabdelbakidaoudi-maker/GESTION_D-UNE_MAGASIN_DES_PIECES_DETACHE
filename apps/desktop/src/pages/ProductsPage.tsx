@@ -33,6 +33,7 @@ export const ProductsPage: React.FC = () => {
   const [colors, setColors] = useState<any[]>([]);
   const [motorcycles, setMotorcycles] = useState<any[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
+  const [savedLocations, setSavedLocations] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -52,8 +53,9 @@ export const ProductsPage: React.FC = () => {
   const [priceSemiGros, setPriceSemiGros] = useState<string>('');
   const [priceGros, setPriceGros] = useState<string>('');
   const [location, setLocation] = useState<string>('');
-    const [selectedColorId, setSelectedColorId] = useState<number | ''>('');
-      const [manualBarcode, setManualBarcode] = useState<string>('');
+  const [unit, setUnit] = useState<string>('PCS');
+  const [selectedColorId, setSelectedColorId] = useState<number | ''>('');
+  const [manualBarcode, setManualBarcode] = useState<string>('');
   const [barcodesList, setBarcodesList] = useState<string[]>([]);
   const [compatibleMotos, setCompatibleMotos] = useState<number[]>([]);
   const [motoSearchFilter, setMotoSearchFilter] = useState('');
@@ -78,10 +80,11 @@ export const ProductsPage: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [prods, meta, locs] = await Promise.all([
+      const [prods, meta, locs, savedLocs] = await Promise.all([
         invokeIpc<Product[]>('get-products', { q: search, storeId: currentStore?.id || 1 }),
         invokeIpc<any>('get-metadata'),
-        invokeIpc<string[]>('get-locations').catch(() => [])
+        invokeIpc<string[]>('get-locations').catch(() => []),
+        invokeIpc<string[]>('get-saved-locations').catch(() => [])
       ]);
 
       setProducts(prods || []);
@@ -92,6 +95,7 @@ export const ProductsPage: React.FC = () => {
         setMotorcycles(meta.motorcycleModels || []);
       }
       setLocations(locs || []);
+      setSavedLocations(savedLocs || []);
 
       if (prods) {
         const cap = prods.reduce((acc, p) => {
@@ -199,6 +203,7 @@ export const ProductsPage: React.FC = () => {
         priceSemiGros: pSemi,
         priceGros: pGros,
         location: location.toUpperCase().trim(),
+        unit: unit || 'PCS',
         colorMode: 'single',
         colorIds: selectedColorId ? [Number(selectedColorId)] : [],
         mergeColorIds: [],
@@ -242,8 +247,9 @@ export const ProductsPage: React.FC = () => {
     setPriceSemiGros('');
     setPriceGros('');
     setLocation('');
-        setSelectedColorId('');
-            setBarcodesList([]);
+    setUnit('PCS');
+    setSelectedColorId('');
+    setBarcodesList([]);
     setManualBarcode('');
     setCompatibleMotos([]);
     setMotoSearchFilter('');
@@ -265,6 +271,7 @@ export const ProductsPage: React.FC = () => {
     setPriceSemiGros(p.priceSemiGros ? String(p.priceSemiGros / 100) : '');
     setPriceGros(p.priceGros ? String(p.priceGros / 100) : '');
     setLocation((p as any).location || '');
+    setUnit((p as any).unit || 'PCS');
     const colorIds = (p.colors || []).map((c: any) => c.colorId);
     setSelectedColorId(colorIds[0] || '');
     setBarcodesList((p.barcodes || []).map((b: any) => b.barcodeValue));
@@ -318,7 +325,7 @@ export const ProductsPage: React.FC = () => {
 
   // Category conditional check for color picker
   const selectedCat = categories.find(c => c.id === Number(categoryId));
-  const isColorEligible = selectedCat ? /car[eéè]nage|accessoire|carrosserie|plastique|couleur/i.test(selectedCat.name) : false;
+  const isColorEligible = selectedCat ? /casque|car[eéè]nage|accessoire|carrosserie|plastique|couleur/i.test(selectedCat.name) : false;
 
   return (
     <div className={`p-6 space-y-6 h-full overflow-y-auto transition-colors ${
@@ -590,24 +597,7 @@ export const ProductsPage: React.FC = () => {
                 </h4>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {isAr ? 'كود المقال (أدخله يدوياً أو اتركه فارغاً لتوليده)' : 'Code Article (Manuel ou vide pour auto)'}
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ex: FLT-001, ART-0005..."
-                      value={customCode}
-                      onChange={e => setCustomCode(e.target.value.toUpperCase())}
-                      disabled={!!editingProduct}
-                      className={`w-full mt-1 border rounded-xl px-3.5 py-2 text-xs font-mono font-bold outline-none uppercase ${
-                        editingProduct ? 'opacity-50 cursor-not-allowed' : ''
-                      } ${
-                        isDark ? 'bg-slate-800 border-slate-700 text-blue-400 placeholder-slate-500' : 'bg-white border-slate-300 text-blue-700 placeholder-slate-400'
-                      }`}
-                    />
-                  </div>
-
+                  {/* Row 1: Name | Code */}
                   <div>
                     <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                       {isAr ? 'تعيين القطعة *' : 'Désignation de la pièce *'}
@@ -627,7 +617,26 @@ export const ProductsPage: React.FC = () => {
 
                   <div>
                     <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {isAr ? 'الصنف' : 'Catégorie'}
+                      {isAr ? 'كود المقال (يدوي أو فارغ للتوليد التلقائي)' : 'Code Article (Manuel ou vide pour auto)'}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: FLT-001, ART-0005..."
+                      value={customCode}
+                      onChange={e => setCustomCode(e.target.value.toUpperCase())}
+                      disabled={!!editingProduct}
+                      className={`w-full mt-1 border rounded-xl px-3.5 py-2 text-xs font-mono font-bold outline-none uppercase ${
+                        editingProduct ? 'opacity-50 cursor-not-allowed' : ''
+                      } ${
+                        isDark ? 'bg-slate-800 border-slate-700 text-blue-400 placeholder-slate-500' : 'bg-white border-slate-300 text-blue-700 placeholder-slate-400'
+                      }`}
+                    />
+                  </div>
+
+                  {/* Row 2: Category | Brand */}
+                  <div>
+                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      {isAr ? 'الصنف / الفئة' : 'Catégorie'}
                     </label>
                     <select
                       value={categoryId}
@@ -636,14 +645,14 @@ export const ProductsPage: React.FC = () => {
                         isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
                       }`}
                     >
-                      <option value="">{isAr ? '-- اختر الصنف --' : '-- Choisir --'}</option>
+                      <option value="">{isAr ? '-- اختر الصنف --' : '-- Choisir Catégorie --'}</option>
                       {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
 
                   <div>
                     <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {isAr ? 'الماركة' : 'Marque / Fabricant'}
+                      {isAr ? 'الماركة / الموتور' : 'Marque / Moteur'}
                     </label>
                     <select
                       value={brandId}
@@ -652,30 +661,12 @@ export const ProductsPage: React.FC = () => {
                         isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
                       }`}
                     >
-                      <option value="">{isAr ? '-- اختر الماركة --' : '-- Choisir --'}</option>
+                      <option value="">{isAr ? '-- اختر الماركة --' : '-- Choisir Marque --'}</option>
                       {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
                   </div>
 
-                  <div>
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {isAr ? 'الموقع في المخزن (اختر أو اكتب جديد)' : 'Emplacement Rayon (ex: A-06, L-08)'}
-                    </label>
-                    <input
-                      type="text"
-                      list="locations-list"
-                      placeholder="A-06"
-                      value={location}
-                      onChange={e => setLocation(e.target.value.toUpperCase())}
-                      className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none uppercase ${
-                        isDark ? 'bg-slate-800 border-slate-700 text-amber-300 placeholder-slate-500' : 'bg-white border-slate-300 text-amber-700 placeholder-slate-400'
-                      }`}
-                    />
-                    <datalist id="locations-list">
-                      {locations.map(loc => <option key={loc} value={loc} />)}
-                    </datalist>
-                  </div>
-
+                  {/* Row 3: Prix Achat | Prix Vente Détail */}
                   <div>
                     <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                       {isAr ? 'سعر الشراء (دج)' : 'Prix d\'Achat (DA)'}
@@ -694,7 +685,7 @@ export const ProductsPage: React.FC = () => {
 
                   <div>
                     <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {isAr ? 'سعر التجزئة (دج) *' : 'Prix Détail (DA) *'}
+                      {isAr ? 'سعر البيع بالتجزئة (دج) *' : 'Prix Vente Détail (DA) *'}
                     </label>
                     <input
                       type="number"
@@ -705,6 +696,23 @@ export const ProductsPage: React.FC = () => {
                       onChange={e => setPriceDetail(e.target.value)}
                       className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono font-bold text-emerald-500 outline-none ${
                         isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'
+                      }`}
+                    />
+                  </div>
+
+                  {/* Row 4: Prix Gros | Prix Semi-Gros */}
+                  <div>
+                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      {isAr ? 'سعر الجملة (دج)' : 'Prix Vente Gros (DA)'}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={priceGros}
+                      onChange={e => setPriceGros(e.target.value)}
+                      className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono outline-none ${
+                        isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
                       }`}
                     />
                   </div>
@@ -725,20 +733,78 @@ export const ProductsPage: React.FC = () => {
                     />
                   </div>
 
+                  {/* Row 5: Unité | Quantité initiale */}
                   <div>
                     <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {isAr ? 'سعر الجملة (دج)' : 'Prix Gros (DA)'}
+                      {isAr ? 'وحدة القياس' : 'Unité de Mesure'}
+                    </label>
+                    <select
+                      value={unit}
+                      onChange={e => setUnit(e.target.value)}
+                      className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-bold outline-none ${
+                        isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                      }`}
+                    >
+                      <option value="PCS">PCS — Pièce</option>
+                      <option value="L">L — Litre</option>
+                      <option value="g">g — Gramme</option>
+                      <option value="kg">kg — Kilogramme</option>
+                      <option value="m">m — Mètre</option>
+                      <option value="jeu">Jeu / Kit</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      {isAr ? 'الكمية الأولية' : 'Quantité Initiale (Stock)'}
                     </label>
                     <input
                       type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={priceGros}
-                      onChange={e => setPriceGros(e.target.value)}
-                      className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono outline-none ${
+                      min="0"
+                      placeholder="0"
+                      value={initialStockStore1}
+                      onChange={e => setInitialStockStore1(e.target.value)}
+                      className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none ${
                         isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
                       }`}
                     />
+                  </div>
+
+                  {/* Row 6: Emplacement (full width) */}
+                  <div className="md:col-span-2">
+                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      {isAr ? 'الموقع في المخزن (اختر أو اكتب جديد)' : 'Emplacement Rayon (choisir ou saisir nouveau — sera sauvegardé)'}
+                    </label>
+                    <div className="flex gap-2 mt-1">
+                      <input
+                        type="text"
+                        list="saved-locations-list"
+                        placeholder="Ex: A-01, CR-03, D-07..."
+                        value={location}
+                        onChange={e => setLocation(e.target.value.toUpperCase())}
+                        className={`flex-1 border rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none uppercase ${
+                          isDark ? 'bg-slate-800 border-slate-700 text-amber-300 placeholder-slate-500' : 'bg-white border-slate-300 text-amber-700 placeholder-slate-400'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!location.trim()) return;
+                          await invokeIpc('add-saved-location', location.trim().toUpperCase());
+                          const locs = await invokeIpc<string[]>('get-saved-locations').catch(() => []);
+                          setSavedLocations(locs || []);
+                        }}
+                        title="Sauvegarder cet emplacement pour usage futur"
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
+                          isDark ? 'bg-amber-600/20 text-amber-400 border-amber-500/40 hover:bg-amber-600/30' : 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
+                        }`}
+                      >
+                        💾 {isAr ? 'حفظ' : 'Sauver'}
+                      </button>
+                    </div>
+                    <datalist id="saved-locations-list">
+                      {[...new Set([...savedLocations, ...locations])].map(loc => <option key={loc} value={loc} />)}
+                    </datalist>
                   </div>
                 </div>
               </div>

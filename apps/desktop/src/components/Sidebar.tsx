@@ -10,11 +10,13 @@ import {
   BarChart3, 
   Calculator, 
   Settings,
-  Bike
+  Bike,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
-  const { activeTab, setActiveTab, hasPermission, lang, theme } = useStore();
+  const { activeTab, setActiveTab, hasPermission, lang, theme, toggleTheme } = useStore();
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
 
@@ -72,6 +74,26 @@ export const Sidebar: React.FC = () => {
           );
         })}
       </nav>
+
+      {/* Theme Toggle */}
+      <div className={`px-3 py-2 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+        <button
+          onClick={toggleTheme}
+          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+            isDark
+              ? 'bg-slate-800 text-amber-400 hover:bg-slate-700 border border-slate-700'
+              : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
+          }`}
+        >
+          <span className="flex items-center gap-2">
+            {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            {isDark ? (isAr ? 'الوضع الداكن' : 'Mode Sombre') : (isAr ? 'الوضع الفاتح' : 'Mode Clair')}
+          </span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-amber-200 text-amber-800'}`}>
+            {isDark ? '🌙' : '☀️'}
+          </span>
+        </button>
+      </div>
 
       {/* Footer Info */}
       <div className={`p-3 border-t text-[11px] text-center ${

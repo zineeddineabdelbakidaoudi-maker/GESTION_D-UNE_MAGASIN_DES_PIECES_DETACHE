@@ -95,6 +95,7 @@ function initLocalSchema(db: Database.Database) {
       price_semi_gros INTEGER NOT NULL DEFAULT 0,
       price_gros INTEGER NOT NULL DEFAULT 0,
       color_mode TEXT NOT NULL DEFAULT 'single',
+      unit TEXT NOT NULL DEFAULT 'PCS',
       location TEXT NOT NULL DEFAULT '',
       photo_base64 TEXT DEFAULT NULL,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -216,7 +217,13 @@ function initLocalSchema(db: Database.Database) {
       price_tier TEXT NOT NULL DEFAULT 'detail',
       qty INTEGER NOT NULL,
       unit_price INTEGER NOT NULL,
+      unit_cost_snapshot INTEGER NOT NULL DEFAULT 0,
       line_total INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS saved_locations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      location TEXT NOT NULL UNIQUE
     );
 
     CREATE TABLE IF NOT EXISTS returns (
@@ -369,6 +376,9 @@ function initLocalSchema(db: Database.Database) {
   try { db.exec(`ALTER TABLE settings ADD COLUMN avg_price_mode INTEGER NOT NULL DEFAULT 1`); } catch {}
   try { db.exec(`ALTER TABLE products ADD COLUMN photo_base64 TEXT DEFAULT NULL`); } catch {}
   try { db.exec(`CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL)`); } catch {}
+  try { db.exec(`ALTER TABLE products ADD COLUMN unit TEXT NOT NULL DEFAULT 'PCS'`); } catch {}
+  try { db.exec(`ALTER TABLE sale_items ADD COLUMN unit_cost_snapshot INTEGER NOT NULL DEFAULT 0`); } catch {}
+  try { db.exec(`CREATE TABLE IF NOT EXISTS saved_locations (id INTEGER PRIMARY KEY AUTOINCREMENT, location TEXT NOT NULL UNIQUE)`); } catch {}
 
   // Ensure rich realistic products are available for testing
   seedRealProductsIfMissing(db);

@@ -172,10 +172,15 @@ function registerIpcHandlers() {
     }
 
     const insertProd = db.prepare(`
-      INSERT INTO products (id, code, name, category_id, brand_id, price_achat, price_detail, price_semi_gros, price_gros, color_mode, location)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO products (id, code, name, category_id, brand_id, price_achat, price_detail, price_semi_gros, price_gros, color_mode, location, unit)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    insertProd.run(nextId, code, payload.name, payload.categoryId || null, payload.brandId || null, payload.priceAchat, payload.priceDetail, payload.priceSemiGros, payload.priceGros, payload.colorMode, payload.location || '');
+    insertProd.run(nextId, code, payload.name, payload.categoryId || null, payload.brandId || null, payload.priceAchat, payload.priceDetail, payload.priceSemiGros, payload.priceGros, payload.colorMode, payload.location || '', payload.unit || 'PCS');
+
+    // Auto-save location to saved_locations for future dropdown
+    if (payload.location && payload.location.trim()) {
+      try { db.prepare('INSERT OR IGNORE INTO saved_locations (location) VALUES (?)').run(payload.location.trim()); } catch {}
+    }
 
     const barcodes = payload.barcodes && payload.barcodes.length > 0 ? payload.barcodes : [generateBarcodeValue(nextId)];
     const insertBarcode = db.prepare('INSERT INTO product_barcodes (product_id, barcode_value, source) VALUES (?, ?, ?)');
@@ -218,7 +223,7 @@ function registerIpcHandlers() {
 
   // Update Product (Edit)
   ipcMain.handle('update-product', (_event, payload: any) => {
-    const { id, name, categoryId, brandId, priceAchat, priceDetail, priceSemiGros, priceGros, colorMode, location, colorIds, mergeColorIds, compatibleModelIds, barcodes } = payload;
+    const { id, name, categoryId, brandId, priceAchat, priceDetail, priceSemiGros, priceGros, colorMode, location, unit, colorIds, mergeColorIds, compatibleModelIds, barcodes } = payload;
     
     // Read avg_price_mode from settings
     const settings = db.prepare('SELECT avg_price_mode FROM settings WHERE store_id = 1').get() as any;
@@ -234,9 +239,9 @@ function registerIpcHandlers() {
     }
 
     db.prepare(`
-      UPDATE products SET name=?, category_id=?, brand_id=?, price_achat=?, price_detail=?, price_semi_gros=?, price_gros=?, color_mode=?, location=?, updated_at=CURRENT_TIMESTAMP
+      UPDATE products SET name=?, category_id=?, brand_id=?, price_achat=?, price_detail=?, price_semi_gros=?, price_gros=?, color_mode=?, location=?, unit=?, updated_at=CURRENT_TIMESTAMP
       WHERE id=?
-    `).run(name, categoryId || null, brandId || null, finalPriceAchat, priceDetail, priceSemiGros, priceGros, colorMode, location || '', id);
+    `).run(name, categoryId || null, brandId || null, finalPriceAchat, priceDetail, priceSemiGros, priceGros, colorMode, location || '', unit || 'PCS', id);
 
     // Update colors
     db.prepare('DELETE FROM product_colors WHERE product_id = ?').run(id);
@@ -262,6 +267,11 @@ function registerIpcHandlers() {
       db.prepare('DELETE FROM product_barcodes WHERE product_id = ?').run(id);
       const insertBarcode = db.prepare('INSERT INTO product_barcodes (product_id, barcode_value, source) VALUES (?, ?, ?)');
       for (const bc of barcodes.slice(0, 5)) insertBarcode.run(id, bc, 'manual');
+    }
+
+    // Auto-save the location to saved_locations for future use
+    if (location && location.trim()) {
+      try { db.prepare('INSERT OR IGNORE INTO saved_locations (location) VALUES (?)').run(location.trim()); } catch {}
     }
 
     return { success: true, id, finalPriceAchat };
@@ -412,12 +422,16 @@ function registerIpcHandlers() {
     `).run(storeId, clientId || null, userId || 1, cashSessionId || null, subtotal, discount || 0, total, actualPaid, amountCredit, paymentType);
     const saleId = saleRes.lastInsertRowid;
 
-    const insertSaleItem = db.prepare('INSERT INTO sale_items (sale_id, product_id, product_color_id, price_tier, qty, unit_price, line_total) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    const insertSaleItem = db.prepare('INSERT INTO sale_items (sale_id, product_id, product_color_id, price_tier, qty, unit_price, unit_cost_snapshot, line_total) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
     const updateStock = db.prepare('UPDATE product_stock SET quantity = quantity - ? WHERE product_id = ? AND store_id = ?');
     const insertMovement = db.prepare('INSERT INTO stock_movements (product_id, store_id, movement_code, qty_before, qty_after, delta, user_id, ref_type, ref_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
 
     for (const it of items) {
-      insertSaleItem.run(saleId, it.productId, it.productColorId || null, it.priceTier, it.qty, it.unitPrice, it.lineTotal);
+      // Capture price_achat AT THIS EXACT MOMENT — prevents future price edits from corrupting historical profits
+      const productNow = db.prepare('SELECT price_achat FROM products WHERE id = ?').get(it.productId) as any;
+      const unitCostSnapshot = productNow ? productNow.price_achat : 0;
+
+      insertSaleItem.run(saleId, it.productId, it.productColorId || null, it.priceTier, it.qty, it.unitPrice, unitCostSnapshot, it.lineTotal);
       const stockRow = db.prepare('SELECT quantity FROM product_stock WHERE product_id = ? AND store_id = ?').get(it.productId, storeId) as any;
       const qtyBefore = stockRow ? stockRow.quantity : 0;
       const qtyAfter = qtyBefore - it.qty;
@@ -602,11 +616,10 @@ function registerIpcHandlers() {
     const totalCA = sales.reduce((acc, s) => acc + s.total, 0);
     const salesCount = sales.length;
 
-    // Real margin: sum(unit_price - price_achat) * qty for all sale items in period
+    // CORRECTED: use unit_cost_snapshot (price frozen at sale time), NOT current product price
     let realMarginSql = `
-      SELECT COALESCE(SUM((si.unit_price - p.price_achat) * si.qty), 0) as margin
+      SELECT COALESCE(SUM((si.unit_price - si.unit_cost_snapshot) * si.qty), 0) as margin
       FROM sale_items si
-      JOIN products p ON si.product_id = p.id
       JOIN sales s ON si.sale_id = s.id
       WHERE ${dateFilter.replace(/created_at/g, 's.created_at')}
     `;
@@ -615,12 +628,25 @@ function registerIpcHandlers() {
     const marginRow = db.prepare(realMarginSql).get(...realMarginParams) as any;
     const totalBeneficesBrut = Math.max(0, marginRow?.margin || 0);
 
-    // Subtract returns from CA
+    // Subtract returns: also subtract the margin lost on returned items
     let returnsSql = `SELECT COALESCE(SUM(total_refund), 0) as totalReturns FROM returns WHERE ${dateFilter.replace(/created_at/g, 'created_at')}`;
     const returnsParams: any[] = [];
     if (storeId) { returnsSql += ' AND store_id = ?'; returnsParams.push(storeId); }
     const returnsRow = db.prepare(returnsSql).get(...returnsParams) as any;
     const totalReturns = returnsRow?.totalReturns || 0;
+
+    // Margin lost on returned items (need to subtract from bénéfice brut)
+    let returnMarginSql = `
+      SELECT COALESCE(SUM((ri.unit_price - si.unit_cost_snapshot) * ri.qty_returned), 0) as returnedMargin
+      FROM return_items ri
+      JOIN sale_items si ON ri.sale_item_id = si.id
+      JOIN returns r ON ri.return_id = r.id
+      WHERE ${dateFilter.replace(/created_at/g, 'r.created_at')}
+    `;
+    const returnMarginParams: any[] = [];
+    if (storeId) { returnMarginSql += ' AND r.store_id = ?'; returnMarginParams.push(storeId); }
+    const returnMarginRow = db.prepare(returnMarginSql).get(...returnMarginParams) as any;
+    const totalReturnedMargin = Math.max(0, returnMarginRow?.returnedMargin || 0);
 
     // Calculate total expenses for the period
     let depFilter = dateFilter.replace(/created_at/g, 'depense_date');
@@ -632,7 +658,7 @@ function registerIpcHandlers() {
     }
     const depRow = db.prepare(depSql).get(...depParams) as any;
     const totalDepenses = depRow?.totalDep || 0;
-    const totalBenefices = Math.max(0, totalBeneficesBrut - totalDepenses - totalReturns);
+    const totalBenefices = Math.max(0, totalBeneficesBrut - totalReturnedMargin - totalDepenses);
 
     const clientsDebt = db.prepare(`
       SELECT COALESCE(SUM(CASE WHEN type = 'achat' THEN amount WHEN type = 'versement' THEN -amount ELSE 0 END), 0) as debt
@@ -649,13 +675,33 @@ function registerIpcHandlers() {
       ORDER BY revenue DESC LIMIT 5
     `).all();
 
-    const chartData = db.prepare(`
-      SELECT date(created_at) as date, SUM(total) as ca, ROUND(SUM(total) * 0.35) as benefice, COUNT(id) as ventesCount
+    // CORRECTED: chartData bénéfice uses real snapshot-based margin, NOT arbitrary 0.35 coefficient
+    const chartDateFilter = storeId
+      ? `${dateFilter} AND store_id = ${storeId}`
+      : dateFilter;
+
+    const chartSales = db.prepare(`
+      SELECT date(created_at) as date, SUM(total) as ca, COUNT(id) as ventesCount
       FROM sales
-      WHERE ${dateFilter}
+      WHERE ${chartDateFilter}
       GROUP BY date(created_at)
       ORDER BY date ASC
-    `).all();
+    `).all() as any[];
+
+    const chartData = chartSales.map((row: any) => {
+      const dayMarginRow = db.prepare(`
+        SELECT COALESCE(SUM((si.unit_price - si.unit_cost_snapshot) * si.qty), 0) as margin
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.id
+        WHERE date(s.created_at) = ? ${storeId ? `AND s.store_id = ${storeId}` : ''}
+      `).get(row.date) as any;
+      return {
+        date: row.date,
+        ca: row.ca,
+        benefice: Math.max(0, dayMarginRow?.margin || 0),
+        ventesCount: row.ventesCount
+      };
+    });
 
     return {
       totalCA: totalCA - totalReturns,
@@ -871,9 +917,24 @@ ${settings?.receiptFooter || 'Merci pour votre confiance !'}
     }
   });
 
-  // Get all distinct used locations
+  // Get all distinct used locations (from products)
   ipcMain.handle('get-locations', () => {
     return db.prepare(`SELECT DISTINCT location FROM products WHERE location != '' ORDER BY location ASC`).all().map((r: any) => r.location);
+  });
+
+  // Get saved locations (persistent dropdown list)
+  ipcMain.handle('get-saved-locations', () => {
+    return db.prepare('SELECT location FROM saved_locations ORDER BY location ASC').all().map((r: any) => r.location);
+  });
+
+  // Add a new saved location
+  ipcMain.handle('add-saved-location', (_event, location: string) => {
+    try {
+      db.prepare('INSERT OR IGNORE INTO saved_locations (location) VALUES (?)').run(location.trim().toUpperCase());
+      return { success: true };
+    } catch {
+      return { success: false };
+    }
   });
 
   // Add a new color
@@ -949,18 +1010,29 @@ ${settings?.receiptFooter || 'Merci pour votre confiance !'}
     const returnsRow = db.prepare(`SELECT COALESCE(SUM(total_refund), 0) as ret FROM returns WHERE date(created_at) = date('now') AND store_id = ?`).get(sid) as any;
     const depensesRow = db.prepare(`SELECT COALESCE(SUM(amount), 0) as dep FROM depenses WHERE date(depense_date) = date('now') AND store_id = ?`).get(sid) as any;
     const detteRow = db.prepare(`SELECT COALESCE(SUM(CASE WHEN type='achat' THEN amount WHEN type='versement' THEN -amount ELSE 0 END),0) as dette FROM client_transactions`).get() as any;
-    
-    const salesItems = db.prepare(`
-      SELECT COALESCE(SUM((si.unit_price - p.price_achat) * si.qty), 0) as margin
-      FROM sale_items si JOIN products p ON si.product_id = p.id
+
+    // CORRECTED: use unit_cost_snapshot — profit frozen at sale time, never changes when prices are edited
+    const marginRow = db.prepare(`
+      SELECT COALESCE(SUM((si.unit_price - si.unit_cost_snapshot) * si.qty), 0) as margin
+      FROM sale_items si
       JOIN sales s ON si.sale_id = s.id
       WHERE date(s.created_at) = date('now') AND s.store_id = ?
     `).get(sid) as any;
 
+    // Subtract margin on today's returned items
+    const returnMarginRow = db.prepare(`
+      SELECT COALESCE(SUM((ri.unit_price - si.unit_cost_snapshot) * ri.qty_returned), 0) as returnedMargin
+      FROM return_items ri
+      JOIN sale_items si ON ri.sale_item_id = si.id
+      JOIN returns r ON ri.return_id = r.id
+      WHERE date(r.created_at) = date('now') AND r.store_id = ?
+    `).get(sid) as any;
+
     const ca = (caRow?.ca || 0) - (returnsRow?.ret || 0);
     const dep = depensesRow?.dep || 0;
-    const beneficeBrut = Math.max(0, salesItems?.margin || 0);
-    const beneficeNet = Math.max(0, beneficeBrut - dep);
+    const beneficeBrut = Math.max(0, marginRow?.margin || 0);
+    const returnedMargin = Math.max(0, returnMarginRow?.returnedMargin || 0);
+    const beneficeNet = Math.max(0, beneficeBrut - returnedMargin - dep);
     return { ca, dep, beneficeNet, dette: Math.max(0, detteRow?.dette || 0) };
   });
 }
