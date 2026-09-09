@@ -40,10 +40,8 @@ export const App: React.FC = () => {
   // Global Keyboard Shortcuts handler — uses cached shortcuts, no IPC call on every key
   const handleGlobalShortcut = useCallback((e: KeyboardEvent) => {
     // Don't trigger shortcuts when typing in an input, textarea, select, or contenteditable
-    const target = e.target as HTMLElement;
-    const tag = target?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-    if (target?.isContentEditable) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
 
     const shortcuts = shortcutsRef.current;
     if (!shortcuts || Object.keys(shortcuts).length === 0) return;
@@ -81,7 +79,7 @@ export const App: React.FC = () => {
   return (
     <div 
       dir={isAr ? 'rtl' : 'ltr'} 
-      className={`h-screen w-screen flex flex-col overflow-hidden select-none transition-colors ${
+      className={`h-screen w-screen flex flex-col overflow-hidden transition-colors ${
         isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
       }`}
     >

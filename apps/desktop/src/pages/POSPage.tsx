@@ -48,6 +48,7 @@ export const POSPage: React.FC = () => {
   const isAr = lang === 'ar';
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<number | ''>('');
   const [selectedColor, setSelectedColor] = useState<number | ''>('');
   const [sortAz, setSortAz] = useState(false);
@@ -55,6 +56,14 @@ export const POSPage: React.FC = () => {
   const [categories, setCategories] = useState<any[]>([]);
   const [colors, setColors] = useState<any[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+
+  // Debounce search query to prevent IPC lagging on fast typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Checkout State
   const [paymentType, setPaymentType] = useState<PaymentMethod>('cash');
@@ -89,7 +98,7 @@ export const POSPage: React.FC = () => {
   const loadProducts = useCallback(async () => {
     try {
       const res = await invokeIpc<Product[]>('get-products', {
-        q: searchQuery,
+        q: debouncedSearchQuery,
         categoryId: selectedCategory ? Number(selectedCategory) : undefined,
         colorId: selectedColor ? Number(selectedColor) : undefined,
         storeId: currentStore?.id,
@@ -99,7 +108,7 @@ export const POSPage: React.FC = () => {
     } catch (err) {
       console.error('Products load error:', err);
     }
-  }, [searchQuery, selectedCategory, selectedColor, sortAz, currentStore]);
+  }, [debouncedSearchQuery, selectedCategory, selectedColor, sortAz, currentStore]);
 
   useEffect(() => {
     loadProducts();

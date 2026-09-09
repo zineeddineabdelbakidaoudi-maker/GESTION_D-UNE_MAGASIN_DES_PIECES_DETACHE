@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { invokeIpc } from '../api/electronBridge';
 import { formatDZD } from '@gestion-veloo/shared';
@@ -15,7 +15,8 @@ import {
   History,
   Calendar,
   Layers,
-  Search
+  Search,
+  X
 } from 'lucide-react';
 
 interface PurchaseItemInput {
@@ -45,6 +46,9 @@ export const PurchasesPage: React.FC = () => {
 
   // Item Selector State
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [itemQty, setItemQty] = useState<string>('1');
   const [itemCostDZD, setItemCostDZD] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -69,10 +73,43 @@ export const PurchasesPage: React.FC = () => {
     loadData();
   }, [currentStore]);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleSelectProduct = (prod: any) => {
     setSelectedProduct(prod);
+    setProductSearchQuery(`${prod.code} - ${prod.name}`);
     setItemCostDZD(((prod.priceAchat || 0) / 100).toString());
+    setIsDropdownOpen(false);
   };
+
+  const handleClearSelectedProduct = () => {
+    setSelectedProduct(null);
+    setProductSearchQuery('');
+    setItemCostDZD('');
+    setItemQty('1');
+    setIsDropdownOpen(false);
+  };
+
+  const filteredProducts = products.filter(p => {
+    if (!productSearchQuery.trim()) return true;
+    const q = productSearchQuery.toLowerCase().trim();
+    return (
+      p.name?.toLowerCase().includes(q) ||
+      p.code?.toLowerCase().includes(q) ||
+      (p.brandName && p.brandName.toLowerCase().includes(q)) ||
+      (p.location && p.location.toLowerCase().includes(q)) ||
+      (p.barcodes && p.barcodes.some((b: any) => b.barcodeValue?.toLowerCase().includes(q)))
+    );
+  }).slice(0, 40);
 
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,9 +138,7 @@ export const PurchasesPage: React.FC = () => {
       ]);
     }
 
-    setSelectedProduct(null);
-    setItemQty('1');
-    setItemCostDZD('');
+    handleClearSelectedProduct();
   };
 
   const toggleAvgPrice = (idx: number) => {
@@ -221,46 +256,160 @@ export const PurchasesPage: React.FC = () => {
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="md:col-span-3">
-                  <label className="text-[11px] font-semibold text-slate-300">{isAr ? 'القطعة' : 'Pièce / Référence'}</label>
-                  <select
-                    value={selectedProduct?.id || ''}
-                    onChange={e => {
-                      const p = products.find(prod => prod.id === parseInt(e.target.value, 10));
-                      if (p) handleSelectProduct(p);
-                    }}
-                    className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none"
-                  >
-                    <option value="">{isAr ? '-- اختر القطعة --' : '-- Sélectionner un produit --'}</option>
-                    {products.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.code} - {p.name} ({p.brandName || 'Générique'})
-                      </option>
-                    ))}
-                  </select>
+                {/* Searchable Product Autocomplete */}
+                <div className="md:col-span-3 relative" ref={dropdownRef}>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-semibold text-slate-300">
+                      {isAr ? 'القطعة / المرجع (ابحث بالاسم، الكود، أو الباركود)' : 'Pièce / Référence (Recherche par désignation, code article, code-barres...)'}
+                    </label>
+                    {selectedProduct && (
+                      <button
+                        type="button"
+                        onClick={handleClearSelectedProduct}
+                        className="text-[10px] text-rose-400 hover:text-rose-300 flex items-center gap-1 font-bold"
+                      >
+                        <X className="w-3 h-3" />
+                        {isAr ? 'إلغاء التحديد' : 'Désélectionner'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="relative mt-1">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={productSearchQuery}
+                      onChange={e => {
+                        setProductSearchQuery(e.target.value);
+                        setIsDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsDropdownOpen(true)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (filteredProducts.length > 0) {
+                            handleSelectProduct(filteredProducts[0]);
+                          }
+                        } else if (e.key === 'Escape') {
+                          setIsDropdownOpen(false);
+                        }
+                      }}
+                      placeholder={isAr ? 'ابحث عن قطعة بالاسم أو الرمز (مثال: BOUGIE, HUILE, FLT...)' : 'Rechercher une pièce par nom, code article, ou code-barres...'}
+                      className="w-full bg-slate-800 border border-slate-700 focus:border-blue-500 rounded-xl pl-9 pr-9 py-2 text-xs font-bold text-white outline-none transition-all placeholder-slate-500"
+                    />
+                    {productSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={handleClearSelectedProduct}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Suggestions Dropdown */}
+                  {isDropdownOpen && (
+                    <div className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-slate-900 border border-slate-700 rounded-xl shadow-2xl divide-y divide-slate-800">
+                      {filteredProducts.length === 0 ? (
+                        <div className="p-3 text-center text-xs text-slate-400 font-medium">
+                          {isAr ? 'لا توجد قطع مطابقة للبحث' : 'Aucune pièce trouvée pour cette recherche'}
+                        </div>
+                      ) : (
+                        filteredProducts.map(p => {
+                          const isSelected = selectedProduct?.id === p.id;
+                          return (
+                            <div
+                              key={p.id}
+                              onClick={() => handleSelectProduct(p)}
+                              className={`p-2.5 flex items-center justify-between cursor-pointer transition-colors ${
+                                isSelected ? 'bg-blue-600/30 text-blue-200' : 'hover:bg-slate-800 text-slate-200'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="px-2 py-0.5 rounded bg-blue-950/80 border border-blue-800/60 font-mono text-[10px] font-bold text-blue-400">
+                                  {p.code}
+                                </span>
+                                <div>
+                                  <div className="text-xs font-bold text-white">{p.name}</div>
+                                  <div className="text-[10px] text-slate-400">
+                                    {p.brandName || 'Générique'} {p.location ? `• Emplacement: ${p.location}` : ''}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-[11px] font-bold text-emerald-400">
+                                  {formatDZD(p.priceAchat || 0)}
+                                </div>
+                                <div className="text-[10px] text-slate-500">
+                                  Stock: {p.totalStock ?? p.stock?.reduce((acc: number, s: any) => acc + (s.quantity || 0), 0) ?? 0}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+
+                  {/* Selected Product Info Badge */}
+                  {selectedProduct && (
+                    <div className="mt-2 p-2 rounded-xl bg-blue-950/40 border border-blue-800/40 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span className="font-bold text-white">{selectedProduct.code} - {selectedProduct.name}</span>
+                        {selectedProduct.brandName && (
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">{selectedProduct.brandName}</span>
+                        )}
+                      </div>
+                      <span className="text-xs font-mono font-bold text-emerald-400">
+                        P. Achat catalogue: {formatDZD(selectedProduct.priceAchat || 0)}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
                   <label className="text-[11px] font-semibold text-slate-300">{isAr ? 'الكمية المشتراة' : 'Quantité Achetée'}</label>
                   <input
-                    type="number"
-                    min="1"
+                    type="text"
+                    inputMode="numeric"
                     value={itemQty}
-                    onChange={e => setItemQty(e.target.value)}
-                    className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-center text-emerald-400 outline-none"
+                    onChange={e => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      setItemQty(val);
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddItem(e);
+                      }
+                    }}
+                    placeholder="1"
+                    className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-center text-emerald-400 outline-none focus:border-blue-500"
                   />
                 </div>
 
                 <div>
                   <label className="text-[11px] font-semibold text-slate-300">{isAr ? 'سعر الشراء الفردي (دج)' : 'Prix d\'Achat Unitaire (DA)'}</label>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     placeholder="0.00"
                     value={itemCostDZD}
-                    onChange={e => setItemCostDZD(e.target.value)}
-                    className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-center text-white outline-none"
+                    onChange={e => {
+                      const val = e.target.value.replace(',', '.');
+                      if (/^[0-9]*\.?[0-9]*$/.test(val)) {
+                        setItemCostDZD(val);
+                      }
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddItem(e);
+                      }
+                    }}
+                    className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-center text-white outline-none focus:border-blue-500"
                   />
                 </div>
 
@@ -269,7 +418,7 @@ export const PurchasesPage: React.FC = () => {
                     type="button"
                     onClick={handleAddItem}
                     disabled={!selectedProduct}
-                    className="w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md"
+                    className="w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md transition-all"
                   >
                     <Plus className="w-4 h-4" />
                     <span>{isAr ? 'إضافة للسند' : 'Ajouter au Bon'}</span>
@@ -395,14 +544,18 @@ export const PurchasesPage: React.FC = () => {
                 <div>
                   <label className="text-[11px] font-semibold text-slate-300">{isAr ? 'المبلغ المدفوع فوراً (دج)' : 'Montant Versé Comptant (DA)'}</label>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     required
                     placeholder="0.00"
                     value={amountPaidDZD}
-                    onChange={e => setAmountPaidDZD(e.target.value)}
-                    className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm font-bold text-emerald-400 outline-none text-center"
+                    onChange={e => {
+                      const val = e.target.value.replace(',', '.');
+                      if (/^[0-9]*\.?[0-9]*$/.test(val)) {
+                        setAmountPaidDZD(val);
+                      }
+                    }}
+                    className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm font-bold text-emerald-400 outline-none text-center focus:border-blue-500"
                   />
                 </div>
               )}

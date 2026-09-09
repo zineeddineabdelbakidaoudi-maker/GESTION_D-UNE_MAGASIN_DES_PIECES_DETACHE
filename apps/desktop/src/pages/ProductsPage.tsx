@@ -28,6 +28,7 @@ export const ProductsPage: React.FC = () => {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categories, setCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
   const [colors, setColors] = useState<any[]>([]);
@@ -40,6 +41,14 @@ export const ProductsPage: React.FC = () => {
   useEffect(() => {
     searchInputRef.current?.focus();
   }, []);
+
+  // Debounce search input to avoid IPC spam on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Add/Edit Product Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -81,7 +90,7 @@ export const ProductsPage: React.FC = () => {
     setLoading(true);
     try {
       const [prods, meta, locs, savedLocs] = await Promise.all([
-        invokeIpc<Product[]>('get-products', { q: search, storeId: currentStore?.id || 1 }),
+        invokeIpc<Product[]>('get-products', { q: debouncedSearch, storeId: currentStore?.id || 1 }),
         invokeIpc<any>('get-metadata'),
         invokeIpc<string[]>('get-locations').catch(() => []),
         invokeIpc<string[]>('get-saved-locations').catch(() => [])
@@ -113,7 +122,7 @@ export const ProductsPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [search, currentStore]);
+  }, [debouncedSearch, currentStore]);
 
   const handleAddManualBarcode = (e: React.FormEvent) => {
     e.preventDefault();
@@ -377,11 +386,12 @@ export const ProductsPage: React.FC = () => {
       }`}>
         <Search className="w-5 h-5 text-slate-400" />
         <input
+          ref={searchInputRef}
           type="text"
           value={search}
-          onChange={e => setSearch(e.target.value.toUpperCase())}
+          onChange={e => setSearch(e.target.value)}
           placeholder={isAr ? 'ابحث برمز القطعة، الاسم، الماركة، أو الموتو المتوافقة...' : 'Rechercher par code article, désignation, marque, moto compatible ou code-barres...'}
-          className={`w-full text-xs font-bold outline-none bg-transparent uppercase ${
+          className={`w-full text-xs font-bold outline-none bg-transparent ${
             isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
           }`}
         />
@@ -402,7 +412,7 @@ export const ProductsPage: React.FC = () => {
               isDark ? 'bg-slate-800/80 text-slate-400 border-slate-800' : 'bg-slate-100 text-slate-600 border-slate-200'
             }`}>
               <tr>
-                <th className="px-3 py-3 text-center w-8">#</th>
+                <th className="px-3 py-3 text-center w-12 font-mono">{isAr ? 'المعرف' : 'ID'}</th>
                 <th className="px-4 py-3">{isAr ? 'الرمز' : 'Code Article'}</th>
                 <th className="px-4 py-3">{isAr ? 'تعيين القطعة' : 'Désignation'}</th>
                 <th className="px-4 py-3">{isAr ? 'الموقع' : 'Emplacement'}</th>
@@ -428,7 +438,7 @@ export const ProductsPage: React.FC = () => {
                     key={p.id} 
                     className={isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}
                   >
-                    <td className="px-3 py-3 text-center text-slate-500 font-mono text-[11px] w-8">{idx + 1}</td>
+                    <td className="px-3 py-3 text-center font-mono font-bold text-blue-400 text-xs w-12" title={`ID: ${p.id}`}>{p.id}</td>
                     <td className="px-4 py-3 font-mono font-bold text-blue-400 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         {hasPhoto && (
@@ -617,21 +627,31 @@ export const ProductsPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {isAr ? 'كود المقال (يدوي أو فارغ للتوليد التلقائي)' : 'Code Article (Manuel ou vide pour auto)'}
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ex: FLT-001, ART-0005..."
-                      value={customCode}
-                      onChange={e => setCustomCode(e.target.value.toUpperCase())}
-                      disabled={!!editingProduct}
-                      className={`w-full mt-1 border rounded-xl px-3.5 py-2 text-xs font-mono font-bold outline-none uppercase ${
-                        editingProduct ? 'opacity-50 cursor-not-allowed' : ''
-                      } ${
-                        isDark ? 'bg-slate-800 border-slate-700 text-blue-400 placeholder-slate-500' : 'bg-white border-slate-300 text-blue-700 placeholder-slate-400'
-                      }`}
-                    />
+                    {(() => {
+                      const nextPredictedId = Math.max(0, ...products.map(p => Number(p.id) || 0)) + 1;
+                      const nextPredictedCode = `ART-${String(nextPredictedId).padStart(5, '0')}`;
+                      return (
+                        <>
+                          <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                            {isAr 
+                              ? `كود المقال (فارغ للتوليد التلقائي: ${nextPredictedCode})` 
+                              : `Code Article (Manuel ou auto: ${nextPredictedCode})`}
+                          </label>
+                          <input
+                            type="text"
+                            placeholder={`Ex: ${nextPredictedCode}`}
+                            value={customCode}
+                            onChange={e => setCustomCode(e.target.value.toUpperCase())}
+                            disabled={!!editingProduct}
+                            className={`w-full mt-1 border rounded-xl px-3.5 py-2 text-xs font-mono font-bold outline-none uppercase ${
+                              editingProduct ? 'opacity-50 cursor-not-allowed' : ''
+                            } ${
+                              isDark ? 'bg-slate-800 border-slate-700 text-blue-400 placeholder-slate-500' : 'bg-white border-slate-300 text-blue-700 placeholder-slate-400'
+                            }`}
+                          />
+                        </>
+                      );
+                    })()}
                   </div>
 
                   {/* Row 2: Category | Brand */}

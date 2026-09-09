@@ -176,11 +176,23 @@ function registerIpcHandlers() {
 
   // Create Product
   ipcMain.handle('create-product', (_event, payload: any) => {
-    const lastProd = db.prepare('SELECT id FROM products ORDER BY id DESC LIMIT 1').get() as any;
-    const nextId = lastProd ? lastProd.id + 1 : 1;
-    const code = payload.customCode ? payload.customCode.trim().toUpperCase() : formatProductCode(nextId);
-    // Check uniqueness of custom code
-    if (payload.customCode) {
+    const maxRow = db.prepare('SELECT COALESCE(MAX(id), 0) as maxId FROM products').get() as any;
+    let nextId = (maxRow?.maxId || 0) + 1;
+    while (db.prepare('SELECT id FROM products WHERE id = ?').get(nextId)) {
+      nextId++;
+    }
+
+    let code = payload.customCode && payload.customCode.trim() 
+      ? payload.customCode.trim().toUpperCase() 
+      : formatProductCode(nextId);
+
+    if (!payload.customCode || !payload.customCode.trim()) {
+      let candidateId = nextId;
+      while (db.prepare('SELECT id FROM products WHERE code = ?').get(code)) {
+        candidateId++;
+        code = formatProductCode(candidateId);
+      }
+    } else {
       const existing = db.prepare('SELECT id FROM products WHERE code = ?').get(code) as any;
       if (existing) throw new Error(`Code article déjà utilisé: ${code}`);
     }

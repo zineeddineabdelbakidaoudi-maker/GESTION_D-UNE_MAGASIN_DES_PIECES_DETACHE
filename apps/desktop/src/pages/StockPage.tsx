@@ -46,7 +46,16 @@ export const StockPage: React.FC = () => {
   const [movementsHistory, setMovementsHistory] = useState<any[]>([]);
   const [selectedMovementFilter, setSelectedMovementFilter] = useState<number | ''>('');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // Debounce search input to avoid IPC spam on keystrokes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Manual Adjustment Modal
   const [showAdjustModal, setShowAdjustModal] = useState(false);
@@ -54,15 +63,13 @@ export const StockPage: React.FC = () => {
   const [adjustNewQty, setAdjustNewQty] = useState('');
   const [adjustNote, setAdjustNote] = useState('');
 
-
-
   const loadStock = async () => {
     setLoading(true);
     try {
       const [stocks, moves] = await Promise.all([
         invokeIpc<StockItem[]>('get-stock', {
           storeId: currentStore?.id,
-          q: search
+          q: debouncedSearch
         }),
         invokeIpc<any[]>('get-stock-movements', {
           storeId: currentStore?.id,
@@ -80,7 +87,7 @@ export const StockPage: React.FC = () => {
 
   useEffect(() => {
     loadStock();
-  }, [search, currentStore, selectedMovementFilter]);
+  }, [debouncedSearch, currentStore, selectedMovementFilter]);
 
   const handleSaveAdjustment = async (e: React.FormEvent) => {
     e.preventDefault();
