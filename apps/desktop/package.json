@@ -48,6 +48,7 @@
   "build": {
     "appId": "com.gestionveloo.pos",
     "productName": "Gestion Pièces Cycles & Motos POS",
+    "npmRebuild": false,
     "directories": {
       "output": "release"
     },
