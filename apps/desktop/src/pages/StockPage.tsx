@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
+import { notify } from '../lib/notify';
 import { invokeIpc } from '../api/electronBridge';
 import { STOCK_MOVEMENT_CODES } from '@gestion-veloo/shared';
 import { formatDZD } from '@gestion-veloo/shared';
@@ -101,11 +102,11 @@ export const StockPage: React.FC = () => {
         userId: currentUser?.id || 1
       });
 
-      alert(isAr ? 'تم تعديل المخزون بنجاح (الرمز 93)!' : 'Stock ajusté avec succès (Code 93) !');
+      notify.success(isAr ? 'تم تعديل المخزون بنجاح (الرمز 93)!' : 'Stock ajusté avec succès (Code 93) !');
       setShowAdjustModal(false);
       loadStock();
-    } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+    } catch (err) {
+      notify.error(err);
     }
   };
 

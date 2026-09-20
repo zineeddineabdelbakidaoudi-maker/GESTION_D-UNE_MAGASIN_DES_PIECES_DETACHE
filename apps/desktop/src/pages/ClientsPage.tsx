@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
+import { notify } from '../lib/notify';
 import { invokeIpc } from '../api/electronBridge';
 import { Client } from '@gestion-veloo/shared';
 import { formatDZD } from '@gestion-veloo/shared';
@@ -67,15 +68,15 @@ export const ClientsPage: React.FC = () => {
     e.preventDefault();
     try {
       await invokeIpc('create-client', { name, phone, address, isFidele });
-      alert(isAr ? 'تمت إضافة الزبون بنجاح!' : 'Client créé avec succès !');
+      notify.success(isAr ? 'تمت إضافة الزبون بنجاح!' : 'Client créé avec succès !');
       setShowAddModal(false);
       setName('');
       setPhone('');
       setAddress('');
       setIsFidele(false);
       loadClients();
-    } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+    } catch (err) {
+      notify.error(err);
     }
   };
 
@@ -93,14 +94,14 @@ export const ClientsPage: React.FC = () => {
         note: versementNote || 'Règlement dette'
       });
 
-      alert(isAr ? 'تم تسجيل الدفعة بنجاح!' : 'Versement enregistré avec succès !');
+      notify.success(isAr ? 'تم تسجيل الدفعة بنجاح!' : 'Versement enregistré avec succès !');
       setShowVersementModal(false);
       setVersementAmount('');
       setVersementNote('');
       loadClients();
       handleSelectClient(selectedClient);
-    } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+    } catch (err) {
+      notify.error(err);
     }
   };
 

@@ -1,5 +1,30 @@
 import { create } from 'zustand';
-import { User, Product, PriceTier, Client, Store, SystemModule } from '@gestion-veloo/shared';
+import { can, type PriceTier, type Store, type SystemModule } from '@gestion-veloo/shared';
+import { invokeIpc } from '../api/electronBridge';
+import type { Product, Client } from '@gestion-veloo/shared';
+
+export interface SessionPermission {
+  module: SystemModule;
+  canView: boolean;
+  canEdit: boolean;
+}
+
+export interface SessionUser {
+  id: number;
+  userId: number;
+  username: string;
+  fullName: string;
+  role: 'owner' | 'manager' | 'cashier' | 'auditor';
+  storeId: number | null;
+  isActive: boolean;
+  permissions: SessionPermission[];
+  mustChangePassword: boolean;
+  startedAt: string;
+}
+
+export interface Capabilities {
+  canSeeCost: boolean;
+}
 
 export interface CartItem {
   product: Product;
@@ -7,13 +32,25 @@ export interface CartItem {
   colorName?: string;
   qty: number;
   priceTier: PriceTier;
-  unitPrice: number; // in centimes
-  lineTotal: number; // in centimes
+  unitPrice: number; // centimes
+  lineTotal: number; // centimes
+}
+
+export type ToastKind = 'success' | 'error' | 'info' | 'warning';
+export interface Toast {
+  id: number;
+  kind: ToastKind;
+  title: string;
+  description?: string;
 }
 
 interface AppState {
-  currentUser: User | null;
+  currentUser: SessionUser | null;
   currentStore: Store | null;
+  stores: Store[];
+  capabilities: Capabilities;
+  sessionChecked: boolean;
+
   activeTab: string;
   cart: CartItem[];
   selectedClient: Client | null;
@@ -21,8 +58,13 @@ interface AppState {
   capital: number;
   lang: 'fr' | 'ar';
   theme: 'dark' | 'light';
+  toasts: Toast[];
 
-  setCurrentUser: (user: User | null) => void;
+  restoreSession: () => Promise<void>;
+  signIn: (username: string, password: string) => Promise<SessionUser>;
+  signOut: () => Promise<void>;
+  applySession: (payload: any) => void;
+
   setCurrentStore: (store: Store | null) => void;
   setActiveTab: (tab: string) => void;
   setCapital: (capital: number) => void;
@@ -30,7 +72,10 @@ interface AppState {
   setTheme: (theme: 'dark' | 'light') => void;
   toggleTheme: () => void;
 
-  // Cart actions
+  pushToast: (toast: Omit<Toast, 'id'>) => void;
+  dismissToast: (id: number) => void;
+  notifyError: (err: unknown, fallbackTitle?: string) => void;
+
   addToCart: (product: Product, priceTier?: PriceTier, colorId?: number, colorName?: string) => void;
   updateCartQty: (productId: number, qty: number) => void;
   updateCartPrice: (productId: number, unitPrice: number) => void;
@@ -42,30 +87,99 @@ interface AppState {
   setCurrentCashSessionId: (id: number | null) => void;
 
   hasPermission: (module: SystemModule, action: 'view' | 'edit') => boolean;
+  /** Premier onglet auquel l'utilisateur a réellement accès. */
+  defaultTab: () => string;
 }
+
+const TAB_MODULES: Array<{ tab: string; module: SystemModule }> = [
+  { tab: 'pos', module: 'pos' },
+  { tab: 'produits', module: 'produits' },
+  { tab: 'stock', module: 'stock' },
+  { tab: 'achat', module: 'achat' },
+  { tab: 'clients', module: 'clients' },
+  { tab: 'fournisseurs', module: 'fournisseurs' },
+  { tab: 'rapport', module: 'rapport' },
+  { tab: 'depenses', module: 'depenses' },
+  { tab: 'zakat', module: 'zakat' },
+  { tab: 'journal', module: 'journal' },
+  { tab: 'utilisateurs', module: 'users' },
+  { tab: 'settings', module: 'settings' }
+];
+
+let toastSeq = 0;
 
 export const useStore = create<AppState>((set, get) => ({
   currentUser: null,
-  currentStore: {
-    id: 1,
-    name: 'Boutique Centre-Ville (Store 1)',
-    address: 'Rue Didouche Mourad, Alger',
-    phone: '0550 11 22 33',
-    createdAt: new Date().toISOString()
-  },
+  currentStore: null,
+  stores: [],
+  capabilities: { canSeeCost: false },
+  sessionChecked: false,
+
   activeTab: 'pos',
   cart: [],
   selectedClient: null,
-  currentCashSessionId: 1,
-  capital: 38465000,
-  lang: 'fr',
+  currentCashSessionId: null,
+  capital: 0,
+  lang: (localStorage.getItem('pos_lang') as 'fr' | 'ar') || 'fr',
   theme: (localStorage.getItem('pos_theme') as 'dark' | 'light') || 'dark',
+  toasts: [],
 
-  setCurrentUser: (user) => set({ currentUser: user }),
+  applySession: (payload) => {
+    if (!payload?.user) return;
+    const user: SessionUser = payload.user;
+    set({
+      currentUser: user,
+      currentStore: payload.store || null,
+      stores: payload.stores || [],
+      capabilities: payload.capabilities || { canSeeCost: false },
+      sessionChecked: true
+    });
+    // On ouvre sur un onglet réellement autorisé, jamais sur un écran vide.
+    const current = get().activeTab;
+    const allowed = TAB_MODULES.find(t => t.tab === current);
+    if (!allowed || !can(user, allowed.module, 'view')) {
+      set({ activeTab: get().defaultTab() });
+    }
+  },
+
+  restoreSession: async () => {
+    try {
+      const payload = await invokeIpc<any>('auth-session');
+      if (payload?.user) get().applySession(payload);
+    } catch {
+      // Pas de session active : l'écran de connexion prend le relais.
+    } finally {
+      set({ sessionChecked: true });
+    }
+  },
+
+  signIn: async (username, password) => {
+    const payload = await invokeIpc<any>('auth-login', { username, password });
+    get().applySession(payload);
+    return payload.user as SessionUser;
+  },
+
+  signOut: async () => {
+    try {
+      await invokeIpc('auth-logout');
+    } catch {}
+    set({
+      currentUser: null,
+      currentStore: null,
+      capabilities: { canSeeCost: false },
+      cart: [],
+      selectedClient: null,
+      activeTab: 'pos'
+    });
+  },
+
   setCurrentStore: (store) => set({ currentStore: store }),
   setActiveTab: (tab) => set({ activeTab: tab }),
   setCapital: (capital) => set({ capital }),
-  setLang: (lang) => set({ lang }),
+  setLang: (lang) => {
+    localStorage.setItem('pos_lang', lang);
+    set({ lang });
+  },
   setTheme: (theme) => {
     localStorage.setItem('pos_theme', theme);
     set({ theme });
@@ -74,6 +188,20 @@ export const useStore = create<AppState>((set, get) => ({
     const next = get().theme === 'dark' ? 'light' : 'dark';
     localStorage.setItem('pos_theme', next);
     set({ theme: next });
+  },
+
+  pushToast: (toast) => {
+    const id = ++toastSeq;
+    set({ toasts: [...get().toasts, { ...toast, id }] });
+    const ttl = toast.kind === 'error' ? 8000 : 4000;
+    setTimeout(() => get().dismissToast(id), ttl);
+  },
+
+  dismissToast: (id) => set({ toasts: get().toasts.filter(t => t.id !== id) }),
+
+  notifyError: (err, fallbackTitle = 'Opération impossible') => {
+    const message = err instanceof Error ? err.message : String(err);
+    get().pushToast({ kind: 'error', title: fallbackTitle, description: message });
   },
 
   addToCart: (product, tier = 'detail', colorId, colorName) => {
@@ -88,21 +216,20 @@ export const useStore = create<AppState>((set, get) => ({
 
     if (existingIndex > -1) {
       const updated = [...cart];
-      updated[existingIndex].qty += 1;
-      updated[existingIndex].lineTotal = updated[existingIndex].qty * updated[existingIndex].unitPrice;
+      const line = { ...updated[existingIndex] };
+      line.qty += 1;
+      line.lineTotal = line.qty * line.unitPrice;
+      updated[existingIndex] = line;
       set({ cart: updated });
-    } else {
-      const newItem: CartItem = {
-        product,
-        productColorId: colorId || null,
-        colorName,
-        qty: 1,
-        priceTier: tier,
-        unitPrice,
-        lineTotal: unitPrice
-      };
-      set({ cart: [newItem, ...cart] });
+      return;
     }
+
+    set({
+      cart: [
+        { product, productColorId: colorId || null, colorName, qty: 1, priceTier: tier, unitPrice, lineTotal: unitPrice },
+        ...cart
+      ]
+    });
   },
 
   updateCartQty: (productId, qty) => {
@@ -110,65 +237,41 @@ export const useStore = create<AppState>((set, get) => ({
       get().removeFromCart(productId);
       return;
     }
-    const updated = get().cart.map(it => {
-      if (it.product.id === productId) {
-        return {
-          ...it,
-          qty,
-          lineTotal: qty * it.unitPrice
-        };
-      }
-      return it;
+    set({
+      cart: get().cart.map(it => (it.product.id === productId ? { ...it, qty, lineTotal: qty * it.unitPrice } : it))
     });
-    set({ cart: updated });
   },
 
   updateCartPrice: (productId, unitPrice) => {
-    const updated = get().cart.map(it => {
-      if (it.product.id === productId) {
-        return {
-          ...it,
-          unitPrice,
-          lineTotal: it.qty * unitPrice
-        };
-      }
-      return it;
+    set({
+      cart: get().cart.map(it => (it.product.id === productId ? { ...it, unitPrice, lineTotal: it.qty * unitPrice } : it))
     });
-    set({ cart: updated });
   },
 
   updateCartTier: (productId, tier) => {
-    const updated = get().cart.map(it => {
-      if (it.product.id === productId) {
+    set({
+      cart: get().cart.map(it => {
+        if (it.product.id !== productId) return it;
         let unitPrice = it.product.priceDetail;
         if (tier === 'semi_gros') unitPrice = it.product.priceSemiGros;
         if (tier === 'gros') unitPrice = it.product.priceGros;
-        return {
-          ...it,
-          priceTier: tier,
-          unitPrice,
-          lineTotal: it.qty * unitPrice
-        };
-      }
-      return it;
+        return { ...it, priceTier: tier, unitPrice, lineTotal: it.qty * unitPrice };
+      })
     });
-    set({ cart: updated });
   },
 
-  removeFromCart: (productId) => {
-    set({ cart: get().cart.filter(it => it.product.id !== productId) });
-  },
-
+  removeFromCart: (productId) => set({ cart: get().cart.filter(it => it.product.id !== productId) }),
   clearCart: () => set({ cart: [], selectedClient: null }),
   setSelectedClient: (client) => set({ selectedClient: client }),
   setCurrentCashSessionId: (id) => set({ currentCashSessionId: id }),
 
-  hasPermission: (module, action) => {
-    const { currentUser } = get();
-    if (!currentUser) return false;
-    if (currentUser.role === 'owner') return true;
-    const perm = currentUser.permissions?.find(p => p.module === module);
-    if (!perm) return false;
-    return action === 'view' ? Boolean(perm.canView) : Boolean(perm.canEdit);
+  // Même fonction que celle appliquée côté process principal : l'interface ne
+  // propose jamais une action qui serait refusée ensuite.
+  hasPermission: (module, action) => can(get().currentUser, module, action),
+
+  defaultTab: () => {
+    const user = get().currentUser;
+    const found = TAB_MODULES.find(t => can(user, t.module, 'view'));
+    return found?.tab || 'pos';
   }
 }));

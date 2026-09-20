@@ -1,93 +1,107 @@
 import { invokeIpc } from './electronBridge';
 
+const DEFAULT_SERVER = 'https://gestion-veloo-server.onrender.com';
+const STORAGE_KEY = 'gv_desktop_server_url';
+
 export function getServerUrl(): string {
-  const custom = localStorage.getItem('gv_desktop_server_url');
-  if (custom && custom.trim()) {
-    let u = custom.trim();
-    if (!u.startsWith('http://') && !u.startsWith('https://')) u = 'https://' + u;
-    return u.replace(/\/$/, '');
+  const custom = localStorage.getItem(STORAGE_KEY);
+  if (custom?.trim()) {
+    let url = custom.trim();
+    if (!/^https?:\/\//.test(url)) url = `https://${url}`;
+    return url.replace(/\/$/, '');
   }
-  return 'https://gestion-veloo-server.onrender.com';
+  return DEFAULT_SERVER;
 }
 
 export function setServerUrl(url: string): void {
-  if (url && url.trim()) {
-    localStorage.setItem('gv_desktop_server_url', url.trim());
-  } else {
-    localStorage.removeItem('gv_desktop_server_url');
-  }
+  if (url?.trim()) localStorage.setItem(STORAGE_KEY, url.trim());
+  else localStorage.removeItem(STORAGE_KEY);
 }
 
 export interface SyncResult {
   success: boolean;
-  message?: string;
-  pushedCount?: number;
-  pulledCount?: number;
+  message: string;
+  pushedCount: number;
+  auditCount: number;
   timestamp: string;
 }
 
-export async function runFullSync(storeId: number = 1): Promise<SyncResult> {
+const PUSH_TIMEOUT_MS = 20000;
+
+async function postJson(url: string, body: unknown): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PUSH_TIMEOUT_MS);
+  try {
+    return await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Pousse vers le portail central tout ce que l'administrateur doit voir :
+ * ventes, achats, retours, mouvements de stock, dépenses, historique des coûts
+ * et — surtout — le journal d'audit complet.
+ *
+ * La caisse reste pleinement opérationnelle si le serveur est injoignable :
+ * les entrées non transmises restent marquées « en attente » localement.
+ */
+export async function runFullSync(storeId = 1): Promise<SyncResult> {
   const serverUrl = getServerUrl();
   const timestamp = new Date().toLocaleTimeString('fr-DZ');
 
+  let payload: any = null;
+
   try {
-    // 1. Gather local data to push
-    const [sales, depenses, stockMovements, purchases] = await Promise.all([
-      invokeIpc<any[]>('get-sales', { storeId }).catch(() => []),
-      invokeIpc<any[]>('get-depenses', { storeId }).catch(() => []),
-      invokeIpc<any[]>('get-stock-movements', { storeId, limit: 300 }).catch(() => []),
-      invokeIpc<any[]>('get-purchases', { storeId }).catch(() => [])
-    ]);
+    payload = await invokeIpc<any>('get-sync-payload', { storeId, limit: 500 });
 
-    // Format Push Payload
-    const pushPayload = {
-      storeId,
-      sales: sales || [],
-      returns: [],
-      purchases: purchases || [],
-      stockMovements: stockMovements || [],
-      clientTransactions: [],
-      supplierTransactions: [],
-      stockTransfers: [],
-      depenses: depenses || []
-    };
+    const response = await postJson(`${serverUrl}/api/sync/push`, payload);
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({} as any));
+      throw new Error(detail?.error || `Le serveur a répondu ${response.status}.`);
+    }
 
-    // 2. Push to Cloud Server
-    const pushRes = await fetch(serverUrl + '/api/sync/push', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(pushPayload)
+    const auditCount = payload.auditEntries?.length || 0;
+    const pushedCount =
+      (payload.sales?.length || 0) +
+      (payload.purchases?.length || 0) +
+      (payload.returns?.length || 0) +
+      (payload.depenses?.length || 0) +
+      auditCount;
+
+    await invokeIpc('mark-sync-result', {
+      success: true,
+      auditCursor: payload.auditCursor,
+      pushedCount,
+      serverUrl
     });
-
-    if (!pushRes.ok) {
-      const err = await pushRes.json().catch(() => ({}));
-      throw new Error(err.error || 'Erreur push cloud HTTP ' + pushRes.status);
-    }
-
-    // 3. Pull Catalog from Cloud Server
-    const pullRes = await fetch(serverUrl + '/api/sync/pull?storeId=' + storeId);
-    if (!pullRes.ok) {
-      throw new Error('Erreur pull cloud HTTP ' + pullRes.status);
-    }
-
-    const cloudCatalog = await pullRes.json();
-    const updates = cloudCatalog?.catalogUpdates || cloudCatalog;
-    const pushedCount = (sales ? sales.length : 0) + (depenses ? depenses.length : 0);
-    const pulledCount = (updates && updates.products) ? updates.products.length : 0;
 
     return {
       success: true,
       pushedCount,
-      pulledCount,
+      auditCount,
       timestamp,
-      message: `Synchronisation avec le Cloud réussie ! (${pushedCount} transaction(s) locale(s) transmise(s), ${pulledCount} article(s) synchronisé(s))`
+      message: `${pushedCount} enregistrement(s) transmis au portail, dont ${auditCount} entrée(s) de journal.`
     };
   } catch (err: any) {
-    console.error('Sync Error:', err);
+    const message = err?.name === 'AbortError'
+      ? 'Le serveur central n\'a pas répondu dans le délai imparti.'
+      : err?.message || 'Communication impossible avec le serveur central.';
+
+    // L'échec est lui aussi journalisé : l'administrateur voit les tentatives ratées.
+    await invokeIpc('mark-sync-result', { success: false, error: message, serverUrl }).catch(() => {});
+
     return {
       success: false,
+      pushedCount: 0,
+      auditCount: payload?.auditEntries?.length || 0,
       timestamp,
-      message: err.message || 'Erreur lors de la communication avec le serveur Cloud'
+      message
     };
   }
 }

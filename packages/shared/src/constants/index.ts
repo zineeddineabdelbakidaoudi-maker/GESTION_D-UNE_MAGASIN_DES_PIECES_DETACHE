@@ -31,7 +31,8 @@ export const SYSTEM_MODULES = [
   'depenses',
   'zakat',
   'settings',
-  'users'
+  'users',
+  'journal'
 ] as const;
 
 export type SystemModule = typeof SYSTEM_MODULES[number];
@@ -47,7 +48,8 @@ export const MODULE_LABELS: Record<SystemModule, string> = {
   depenses: 'Dépenses & Charges',
   zakat: 'Calculateur de Zakat',
   settings: 'Paramètres & Profil',
-  users: 'Gestion des Utilisateurs'
+  users: 'Gestion des Utilisateurs & Rôles',
+  journal: "Journal d'Audit & Traçabilité"
 };
 
 // Price Tiers

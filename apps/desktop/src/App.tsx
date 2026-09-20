@@ -1,9 +1,11 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from './store/useStore';
 import { LoginPage } from './pages/LoginPage';
 import { TrialBanner } from './components/TrialBanner';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
+import { Toaster, AccessDenied, LoadingState } from './components/ui';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { POSPage } from './pages/POSPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { StockPage } from './pages/StockPage';
@@ -14,104 +16,174 @@ import { ReportsPage } from './pages/ReportsPage';
 import { ZakatPage } from './pages/ZakatPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { DepensesPage } from './pages/DepensesPage';
-import { invokeIpc } from './api/electronBridge';
+import { JournalPage } from './pages/JournalPage';
+import { UsersPage } from './pages/UsersPage';
+import { invokeIpcSafe, onSessionExpired } from './api/electronBridge';
+import { MODULE_LABELS, type SystemModule } from '@gestion-veloo/shared';
+
+/** Chaque onglet déclare le module qui conditionne son accès. */
+const TAB_REGISTRY: Array<{ id: string; module: SystemModule; render: () => JSX.Element }> = [
+  { id: 'pos', module: 'pos', render: () => <POSPage /> },
+  { id: 'produits', module: 'produits', render: () => <ProductsPage /> },
+  { id: 'stock', module: 'stock', render: () => <StockPage /> },
+  { id: 'achat', module: 'achat', render: () => <PurchasesPage /> },
+  { id: 'clients', module: 'clients', render: () => <ClientsPage /> },
+  { id: 'fournisseurs', module: 'fournisseurs', render: () => <SuppliersPage /> },
+  { id: 'rapport', module: 'rapport', render: () => <ReportsPage /> },
+  { id: 'depenses', module: 'depenses', render: () => <DepensesPage /> },
+  { id: 'zakat', module: 'zakat', render: () => <ZakatPage /> },
+  { id: 'journal', module: 'journal', render: () => <JournalPage /> },
+  { id: 'utilisateurs', module: 'users', render: () => <UsersPage /> },
+  { id: 'settings', module: 'settings', render: () => <SettingsPage /> }
+];
+
+const SHORTCUT_TO_TAB: Record<string, string> = {
+  goto_pos: 'pos',
+  goto_produits: 'produits',
+  goto_stock: 'stock',
+  goto_achat: 'achat',
+  goto_clients: 'clients',
+  goto_fournisseurs: 'fournisseurs',
+  goto_rapport: 'rapport',
+  goto_depenses: 'depenses',
+  goto_journal: 'journal',
+  goto_users: 'utilisateurs',
+  goto_settings: 'settings'
+};
 
 export const App: React.FC = () => {
-  const { currentUser, activeTab, setActiveTab, theme, lang } = useStore();
+  const {
+    currentUser, activeTab, setActiveTab, theme, lang,
+    sessionChecked, restoreSession, signOut, hasPermission, pushToast
+  } = useStore();
+
   const isDark = theme === 'dark';
   const isAr = lang === 'ar';
+  const [passwordModal, setPasswordModal] = useState(false);
+  const shortcutsRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDark]);
+    document.documentElement.classList.toggle('dark', isDark);
+    document.documentElement.lang = isAr ? 'ar' : 'fr';
+    document.documentElement.dir = isAr ? 'rtl' : 'ltr';
+  }, [isDark, isAr]);
 
-  // Load shortcuts once on mount, cache in ref to avoid calling IPC on every keypress
-  const shortcutsRef = React.useRef<Record<string, string>>({});
+  // Une session peut survivre à un rechargement de la fenêtre : on la récupère.
   useEffect(() => {
-    invokeIpc<Record<string, string>>('get-shortcuts').then(sc => {
-      if (sc) shortcutsRef.current = sc;
-    }).catch(() => {});
-  }, []);
+    restoreSession();
+  }, [restoreSession]);
 
-  // Global Keyboard Shortcuts handler — uses cached shortcuts, no IPC call on every key
-  const handleGlobalShortcut = useCallback((e: KeyboardEvent) => {
-    // Don't trigger shortcuts when typing in an input, textarea, select, or contenteditable
-    const target = e.target as HTMLElement | null;
-    if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+  // Expiration côté process principal : on renvoie l'utilisateur à la connexion.
+  useEffect(() => {
+    return onSessionExpired(err => {
+      pushToast({ kind: 'warning', title: 'Session terminée', description: err.message });
+      signOut();
+    });
+  }, [signOut, pushToast]);
 
-    const shortcuts = shortcutsRef.current;
-    if (!shortcuts || Object.keys(shortcuts).length === 0) return;
+  useEffect(() => {
+    if (!currentUser) return;
+    invokeIpcSafe<Record<string, string>>('get-shortcuts', undefined, {}).then(sc => {
+      shortcutsRef.current = sc || {};
+    });
+  }, [currentUser]);
 
-    const pressed = [
-      e.ctrlKey && 'Control',
-      e.shiftKey && 'Shift',
-      e.altKey && 'Alt',
-      e.key !== 'Control' && e.key !== 'Shift' && e.key !== 'Alt' && e.key
-    ].filter(Boolean).join('+');
+  const handleGlobalShortcut = useCallback(
+    (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
 
-    const action = Object.entries(shortcuts).find(([_, sc]) => sc === pressed)?.[0];
-    if (!action) return;
+      const shortcuts = shortcutsRef.current;
+      if (!shortcuts || !Object.keys(shortcuts).length) return;
 
-    const navMap: Record<string, string> = {
-      goto_pos: 'pos', goto_produits: 'produits', goto_stock: 'stock',
-      goto_achat: 'achat', goto_clients: 'clients', goto_fournisseurs: 'fournisseurs',
-      goto_rapport: 'rapport', goto_depenses: 'depenses', goto_settings: 'settings'
-    };
-    if (navMap[action]) {
+      const pressed = [
+        e.ctrlKey && 'Control',
+        e.shiftKey && 'Shift',
+        e.altKey && 'Alt',
+        !['Control', 'Shift', 'Alt'].includes(e.key) && e.key
+      ].filter(Boolean).join('+');
+
+      const action = Object.entries(shortcuts).find(([, sc]) => sc === pressed)?.[0];
+      const tab = action ? SHORTCUT_TO_TAB[action] : undefined;
+      if (!tab) return;
+
+      const entry = TAB_REGISTRY.find(t => t.id === tab);
+      if (!entry) return;
+
       e.preventDefault();
-      setActiveTab(navMap[action]);
-    }
-  }, [setActiveTab]);
+      // Un raccourci ne doit jamais ouvrir un module interdit.
+      if (!hasPermission(entry.module, 'view')) {
+        pushToast({
+          kind: 'warning',
+          title: 'Module non autorisé',
+          description: `Vous n'avez pas accès à « ${MODULE_LABELS[entry.module]} ».`
+        });
+        return;
+      }
+      setActiveTab(tab);
+    },
+    [setActiveTab, hasPermission, pushToast]
+  );
 
   useEffect(() => {
     window.addEventListener('keydown', handleGlobalShortcut);
     return () => window.removeEventListener('keydown', handleGlobalShortcut);
   }, [handleGlobalShortcut]);
 
-  if (!currentUser) {
-    return <LoginPage />;
+  if (!sessionChecked) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center" style={{ backgroundColor: 'rgb(var(--gv-bg))' }}>
+        <LoadingState label="Ouverture de la caisse…" />
+      </div>
+    );
   }
 
+  if (!currentUser) {
+    return (
+      <>
+        <LoginPage />
+        <Toaster />
+      </>
+    );
+  }
+
+  const current = TAB_REGISTRY.find(t => t.id === activeTab);
+  const allowed = current ? hasPermission(current.module, 'view') : false;
+
   return (
-    <div 
-      dir={isAr ? 'rtl' : 'ltr'} 
-      className={`h-screen w-screen flex flex-col overflow-hidden transition-colors ${
-        isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
-      }`}
-    >
-      {/* 24h Trial Persistent Banner & Countdown */}
+    <div className="h-screen w-screen flex flex-col overflow-hidden" style={{ backgroundColor: 'rgb(var(--gv-bg))', color: 'rgb(var(--gv-text))' }}>
       <TrialBanner />
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Main Left Sidebar */}
         <Sidebar />
 
-        {/* Content Area */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {/* Top Bar with Live Capital & Douchette Indicator */}
-          <Header />
+          <Header onChangePassword={() => setPasswordModal(true)} />
 
-          {/* Module Views */}
-          <main className={`flex-1 overflow-hidden transition-colors ${
-            isDark ? 'bg-slate-950' : 'bg-slate-50'
-          }`}>
-            {activeTab === 'pos' && <POSPage />}
-            {activeTab === 'produits' && <ProductsPage />}
-            {activeTab === 'stock' && <StockPage />}
-            {activeTab === 'achat' && <PurchasesPage />}
-            {activeTab === 'clients' && <ClientsPage />}
-            {activeTab === 'fournisseurs' && <SuppliersPage />}
-            {activeTab === 'rapport' && <ReportsPage />}
-            {activeTab === 'depenses' && <DepensesPage />}
-            {activeTab === 'zakat' && <ZakatPage />}
-            {activeTab === 'settings' && <SettingsPage />}
+          <main className="flex-1 overflow-hidden" style={{ backgroundColor: 'rgb(var(--gv-bg))' }}>
+            {!current ? (
+              <AccessDenied />
+            ) : allowed ? (
+              current.render()
+            ) : (
+              <AccessDenied module={MODULE_LABELS[current.module]} />
+            )}
           </main>
         </div>
       </div>
+
+      <ChangePasswordModal
+        open={passwordModal || currentUser.mustChangePassword}
+        forced={currentUser.mustChangePassword}
+        onClose={() => setPasswordModal(false)}
+        onDone={() => {
+          setPasswordModal(false);
+          // Le drapeau « mot de passe à changer » est levé côté session : on la recharge.
+          restoreSession();
+        }}
+      />
+
+      <Toaster />
     </div>
   );
 };

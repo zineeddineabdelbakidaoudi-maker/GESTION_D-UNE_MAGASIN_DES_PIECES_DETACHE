@@ -42,7 +42,9 @@ export const POSPage: React.FC = () => {
     selectedClient,
     setSelectedClient,
     hasPermission,
-    lang
+    lang,
+    pushToast,
+    notifyError
   } = useStore();
 
   const isAr = lang === 'ar';
@@ -79,6 +81,7 @@ export const POSPage: React.FC = () => {
   const [pastSales, setPastSales] = useState<any[]>([]);
   const [selectedPastSale, setSelectedPastSale] = useState<any | null>(null);
   const [returnItemsState, setReturnItemsState] = useState<Record<number, number>>({});
+  const [returnReason, setReturnReason] = useState('');
 
   // View toggle: cards or list
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
@@ -228,8 +231,8 @@ export const POSPage: React.FC = () => {
 
       // Automatically push sale to Cloud server in background
       runFullSync(currentStore?.id || 1).catch(e => console.warn('Auto-sync notice:', e));
-    } catch (err: any) {
-      alert(`Erreur de validation de vente : ${err.message}`);
+    } catch (err) {
+      notifyError(err, isAr ? 'تعذّر تأكيد البيع' : 'Vente non validée');
     } finally {
       setCheckoutLoading(false);
     }
@@ -243,8 +246,8 @@ export const POSPage: React.FC = () => {
       setSelectedPastSale(null);
       setReturnItemsState({});
       setShowReturnModal(true);
-    } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+    } catch (err) {
+      notifyError(err, isAr ? 'تعذّر تحميل المبيعات' : 'Historique des ventes indisponible');
     }
   };
 
@@ -257,6 +260,7 @@ export const POSPage: React.FC = () => {
       });
     }
     setReturnItemsState(initialReturns);
+    setReturnReason('');
   };
 
   const handleConfirmReturn = async () => {
@@ -275,23 +279,43 @@ export const POSPage: React.FC = () => {
       .filter(it => it.qtyReturned > 0);
 
     if (itemsToReturn.length === 0) {
-      alert(isAr ? 'يرجى تحديد قطعة واحدة على الأقل للإرجاع.' : 'Veuillez sélectionner au moins un article à retourner.');
+      pushToast({
+        kind: 'warning',
+        title: isAr ? 'لم يتم تحديد أي قطعة' : 'Aucun article sélectionné',
+        description: isAr ? 'اختر قطعة واحدة على الأقل للإرجاع.' : 'Indiquez au moins une quantité à retourner.'
+      });
+      return;
+    }
+
+    if (returnReason.trim().length < 3) {
+      pushToast({
+        kind: 'warning',
+        title: isAr ? 'السبب مطلوب' : 'Motif obligatoire',
+        description: isAr ? 'اذكر سبب الإرجاع (3 أحرف على الأقل).' : "Indiquez le motif du retour : il est inscrit au journal d'audit."
+      });
       return;
     }
 
     try {
-      await invokeIpc('process-return', {
+      const res = await invokeIpc<any>('process-return', {
         saleId: selectedPastSale.id,
         storeId: currentStore?.id || 1,
-        userId: currentUser?.id || 1,
-        items: itemsToReturn
+        items: itemsToReturn,
+        reason: returnReason.trim()
       });
 
-      alert(isAr ? 'تم تأكيد الإرجاع بنجاح وتحديث المخزون (رمز 92)!' : 'Retour validé avec succès et stock réintégré (Code 92) !');
+      pushToast({
+        kind: 'success',
+        title: isAr ? 'تم تأكيد الإرجاع' : 'Retour validé (Code 92)',
+        description: isAr
+          ? `تمت إعادة ${formatDZD(res.totalRefund)} إلى المخزون.`
+          : `${formatDZD(res.totalRefund)} remboursés${res.creditOffset ? ` (dont ${formatDZD(res.creditOffset)} déduits de la dette client)` : ''}. Stock réintégré.`
+      });
       setShowReturnModal(false);
+      setSelectedPastSale(null);
       loadProducts();
-    } catch (err: any) {
-      alert(`Erreur lors du retour : ${err.message}`);
+    } catch (err) {
+      notifyError(err, isAr ? 'تعذّر تنفيذ الإرجاع' : 'Retour impossible');
     }
   };
 
@@ -978,6 +1002,22 @@ export const POSPage: React.FC = () => {
                   </div>
                 </div>
 
+                <div>
+                  <label className="text-xs font-bold text-slate-300 uppercase block mb-1.5">
+                    {isAr ? 'سبب الإرجاع (إلزامي)' : 'Motif du retour (obligatoire)'}
+                  </label>
+                  <textarea
+                    value={returnReason}
+                    onChange={e => setReturnReason(e.target.value)}
+                    rows={2}
+                    placeholder={isAr ? 'مثال : قطعة غير مطابقة' : 'Ex. pièce non conforme, erreur de référence…'}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-amber-500 resize-none"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    {isAr ? 'يُسجَّل هذا السبب في سجل التدقيق.' : "Ce motif est enregistré au journal d'audit avec votre nom."}
+                  </p>
+                </div>
+
                 <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
                   <button
                     type="button"
@@ -989,7 +1029,8 @@ export const POSPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleConfirmReturn}
-                    className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded-xl text-xs shadow-md flex items-center gap-2"
+                    disabled={returnReason.trim().length < 3}
+                    className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-bold rounded-xl text-xs shadow-md flex items-center gap-2"
                   >
                     <RotateCcw className="w-4 h-4" />
                     <span>{isAr ? 'تأكيد الإرجاع وإعادة التخزين (92)' : 'Valider le Retour (Code 92)'}</span>

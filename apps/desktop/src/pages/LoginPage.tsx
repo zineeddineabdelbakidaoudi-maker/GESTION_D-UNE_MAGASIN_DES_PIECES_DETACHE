@@ -1,245 +1,167 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
-import { invokeIpc } from '../api/electronBridge';
-import { Bike, Lock, User, Store as StoreIcon, ShieldCheck, Sun, Moon, Languages } from 'lucide-react';
+import { invokeIpcSafe, IpcError } from '../api/electronBridge';
+import { Bike, Lock, User, ShieldCheck, Sun, Moon, Languages, AlertTriangle, Loader2, Server } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
-  const { setCurrentUser, setCurrentStore, lang, setLang, theme, toggleTheme } = useStore();
+  const { signIn, lang, setLang, theme, toggleTheme } = useStore();
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
 
-  const [username, setUsername] = useState('vendeur1');
-  const [password, setPassword] = useState('vendeur123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [stores, setStores] = useState<any[]>([]);
-  const [error, setError] = useState('');
+  const [deviceId, setDeviceId] = useState('');
+  const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const usernameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    invokeIpc<any>('get-metadata').then(res => {
-      if (res && res.stores) {
-        setStores(res.stores);
-      }
+    invokeIpcSafe<any>('get-bootstrap', undefined, null).then(res => {
+      if (res?.stores) setStores(res.stores);
+      if (res?.deviceId) setDeviceId(res.deviceId);
     });
+    usernameRef.current?.focus();
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError(null);
     setLoading(true);
-
     try {
-      // Authenticate via local SQLite / IPC
-      let authUser: any = null;
-
-      if (username === 'admin' || username === 'gerant') {
-        authUser = {
-          id: 1,
-          storeId: null,
-          fullName: 'Propriétaire Gérant',
-          username: 'admin',
-          role: 'owner',
-          isActive: true
-        };
-      } else if (username === 'vendeur1') {
-        authUser = {
-          id: 2,
-          storeId: 1,
-          fullName: 'Vendeur Magasin 1 (Centre-Ville)',
-          username: 'vendeur1',
-          role: 'cashier',
-          isActive: true,
-          permissions: [
-            { module: 'pos', canView: true, canEdit: true },
-            { module: 'produits', canView: true, canEdit: true },
-            { module: 'stock', canView: true, canEdit: true },
-            { module: 'achat', canView: true, canEdit: true },
-            { module: 'clients', canView: true, canEdit: true },
-            { module: 'fournisseurs', canView: true, canEdit: false },
-            { module: 'rapport', canView: true, canEdit: false },
-            { module: 'depenses', canView: true, canEdit: true },
-            { module: 'zakat', canView: false, canEdit: false },
-            { module: 'settings', canView: true, canEdit: false }
-          ]
-        };
-      } else if (username === 'vendeur2') {
-        authUser = {
-          id: 3,
-          storeId: 2,
-          fullName: 'Vendeur Magasin 2 (Zone Industrielle)',
-          username: 'vendeur2',
-          role: 'cashier',
-          isActive: true,
-          permissions: [
-            { module: 'pos', canView: true, canEdit: true },
-            { module: 'produits', canView: true, canEdit: true },
-            { module: 'stock', canView: true, canEdit: true },
-            { module: 'achat', canView: true, canEdit: true },
-            { module: 'clients', canView: true, canEdit: true },
-            { module: 'fournisseurs', canView: true, canEdit: false },
-            { module: 'rapport', canView: true, canEdit: false },
-            { module: 'depenses', canView: true, canEdit: true },
-            { module: 'zakat', canView: false, canEdit: false },
-            { module: 'settings', canView: true, canEdit: false }
-          ]
-        };
-      } else {
-        throw new Error(isAr ? 'اسم المستخدم أو كلمة المرور غير صحيحة' : 'Identifiant ou mot de passe incorrect.');
-      }
-
-      // Assign store
-      let assignedStore = null;
-      if (authUser.storeId) {
-        assignedStore = stores.find(s => s.id === authUser.storeId) || {
-          id: authUser.storeId,
-          name: authUser.storeId === 1 ? 'Boutique Centre-Ville (Store 1)' : 'Boutique Zone Industrielle (Store 2)'
-        };
-      } else {
-        assignedStore = stores[0] || { id: 1, name: 'Boutique Centre-Ville (Store 1)' };
-      }
-
-      setCurrentStore(assignedStore);
-      setCurrentUser(authUser);
-    } catch (err: any) {
-      setError(err.message);
+      await signIn(username, password);
+    } catch (err) {
+      const ipcErr = err as IpcError;
+      setError({ message: ipcErr.message, code: ipcErr.code });
+      setPassword('');
     } finally {
       setLoading(false);
     }
   };
 
+  const isLockout = error?.code === 'ACCOUNT_LOCKED';
+
   return (
-    <div className={`min-h-screen w-screen flex flex-col items-center justify-center p-6 transition-colors select-none ${
-      isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
-    }`}>
-      {/* Top Header Toggles */}
-      <div className="absolute top-6 right-6 flex items-center gap-3">
-        <button
-          onClick={toggleTheme}
-          className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-xl text-xs font-bold transition-all shadow-sm ${
-            isDark 
-              ? 'bg-slate-900 border-slate-800 text-amber-400 hover:bg-slate-800' 
-              : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
-          }`}
-        >
-          {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+    <div
+      dir={isAr ? 'rtl' : 'ltr'}
+      className={`min-h-screen w-screen flex flex-col items-center justify-center p-6 select-none relative overflow-hidden ${
+        isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
+      }`}
+    >
+      {/* Fond décoratif discret, sans image externe (l'application reste 100 % hors ligne). */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.35]"
+        style={{
+          background: isDark
+            ? 'radial-gradient(60rem 40rem at 15% -10%, rgba(37,99,235,0.28), transparent 60%), radial-gradient(50rem 35rem at 110% 110%, rgba(16,185,129,0.18), transparent 60%)'
+            : 'radial-gradient(60rem 40rem at 15% -10%, rgba(37,99,235,0.18), transparent 60%), radial-gradient(50rem 35rem at 110% 110%, rgba(16,185,129,0.14), transparent 60%)'
+        }}
+      />
+
+      <div className="absolute top-6 end-6 flex items-center gap-2 z-10">
+        <button onClick={toggleTheme} className="gv-btn-ghost" type="button">
+          {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
           <span>{isDark ? 'Clair' : 'Sombre'}</span>
         </button>
-
-        <button
-          onClick={() => setLang(isAr ? 'fr' : 'ar')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-xl text-xs font-bold transition-colors ${
-            isDark ? 'bg-slate-900 border-slate-800 text-blue-400 hover:bg-slate-800' : 'bg-white border-slate-300 text-blue-600 hover:bg-slate-50'
-          }`}
-        >
-          <Languages className="w-3.5 h-3.5" />
+        <button onClick={() => setLang(isAr ? 'fr' : 'ar')} className="gv-btn-ghost" type="button">
+          <Languages className="w-4 h-4" />
           <span>{isAr ? 'Français' : 'العربية'}</span>
         </button>
       </div>
 
-      <div className={`w-full max-w-md p-8 rounded-3xl border shadow-2xl space-y-6 transition-all ${
-        isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
-      }`}>
-        {/* Brand Header */}
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-bold mx-auto shadow-xl shadow-blue-600/30">
-            <Bike className="w-8 h-8" />
+      <div className="w-full max-w-md gv-card !p-8 space-y-6 relative z-10" style={{ boxShadow: 'var(--gv-shadow-lg)' }}>
+        <div className="text-center space-y-2.5">
+          <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-white mx-auto shadow-xl shadow-blue-600/30">
+            <Bike className="w-9 h-9" />
           </div>
-          <h1 className={`text-xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            {isAr ? 'نظام تسيير قطع الدراجات والموتو' : 'Gestion Pièces Cycles & Motos POS'}
+          <h1 className="text-xl font-black tracking-tight">
+            {isAr ? 'نظام تسيير قطع الدراجات والموتو' : 'Gestion Pièces Cycles & Motos'}
           </h1>
-          <p className="text-xs text-slate-400">
-            {isAr ? 'تسجيل الدخول لبدء جلسة الصندوق بالمحل' : 'Connexion et affectation automatique de la boutique de caisse.'}
+          <p className="text-xs gv-muted">
+            {isAr ? 'سجّل الدخول لفتح صندوق المحل' : 'Authentification requise pour ouvrir la caisse.'}
           </p>
         </div>
 
         {error && (
-          <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl text-xs font-semibold text-center">
-            {error}
+          <div
+            role="alert"
+            className={`p-3 rounded-xl text-xs font-semibold flex items-start gap-2.5 ${
+              isLockout
+                ? 'bg-amber-500/10 border border-amber-500/40 text-amber-500'
+                : 'bg-rose-500/10 border border-rose-500/40 text-rose-500'
+            }`}
+          >
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{error.message}</span>
           </div>
         )}
 
-        {/* Login Form */}
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
-              {isAr ? 'اسم المستخدم (Identifiant) :' : 'Identifiant Caissier / Gérant :'}
+            <label className="gv-label" htmlFor="gv-username">
+              {isAr ? 'اسم المستخدم' : 'Identifiant'}
             </label>
-            <div className={`mt-1.5 flex items-center gap-2 border rounded-xl px-3.5 py-2.5 transition-colors ${
-              isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-300'
-            }`}>
-              <User className="w-4 h-4 text-blue-500" />
+            <div className="relative">
+              <User className="w-4 h-4 text-blue-500 absolute start-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
+                id="gv-username"
+                ref={usernameRef}
                 type="text"
                 required
+                autoComplete="username"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
-                placeholder="vendeur1, vendeur2 ou admin"
-                className={`w-full bg-transparent text-xs font-bold outline-none ${
-                  isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
-                }`}
+                placeholder={isAr ? 'أدخل اسم المستخدم' : 'Votre identifiant'}
+                className="gv-input ps-10"
               />
             </div>
           </div>
 
           <div>
-            <label className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
-              {isAr ? 'كلمة المرور :' : 'Mot de passe :'}
+            <label className="gv-label" htmlFor="gv-password">
+              {isAr ? 'كلمة المرور' : 'Mot de passe'}
             </label>
-            <div className={`mt-1.5 flex items-center gap-2 border rounded-xl px-3.5 py-2.5 transition-colors ${
-              isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-300'
-            }`}>
-              <Lock className="w-4 h-4 text-emerald-500" />
+            <div className="relative">
+              <Lock className="w-4 h-4 text-emerald-500 absolute start-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
+                id="gv-password"
                 type="password"
                 required
+                autoComplete="current-password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className={`w-full bg-transparent text-xs font-bold outline-none ${
-                  isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
-                }`}
+                className="gv-input ps-10"
               />
             </div>
           </div>
 
-          {/* Quick Profile Shortcuts for easy cashier switching */}
-          <div className="space-y-1.5 pt-1">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">
-              {isAr ? 'حسابات سريعة للتجربة :' : 'Comptes de Démonstration :'}
+          <button type="submit" disabled={loading || !username || !password} className="gv-btn-primary w-full !py-3">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+            <span>
+              {loading
+                ? isAr ? 'جارٍ التحقق...' : 'Vérification…'
+                : isAr ? 'فتح الصندوق' : 'Ouvrir la caisse'}
             </span>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { u: 'vendeur1', p: 'vendeur123', label: 'Magasin 1 (Centre)' },
-                { u: 'vendeur2', p: 'vendeur123', label: 'Magasin 2 (Dépôt)' },
-                { u: 'admin', p: 'admin123', label: 'Gérant (Admin)' }
-              ].map(acc => (
-                <button
-                  key={acc.u}
-                  type="button"
-                  onClick={() => {
-                    setUsername(acc.u);
-                    setPassword(acc.p);
-                  }}
-                  className={`p-2 rounded-xl border text-[10px] font-bold text-center transition-all ${
-                    username === acc.u
-                      ? 'bg-blue-600/20 border-blue-500 text-blue-400'
-                      : isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  {acc.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-bold rounded-xl text-xs shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2 mt-4"
-          >
-            <ShieldCheck className="w-4 h-4" />
-            <span>{loading ? (isAr ? 'جار التحقق...' : 'Vérification...') : (isAr ? 'فتح الصندوق وبدء الجلسة' : 'Ouvrir la Caisse & Se Connecter')}</span>
           </button>
         </form>
+
+        <div className="gv-divider" />
+
+        <div className="flex items-center justify-between text-[10px] gv-muted">
+          <span className="inline-flex items-center gap-1.5">
+            <Server className="w-3.5 h-3.5" />
+            {stores.length} {isAr ? 'محل' : stores.length > 1 ? 'boutiques' : 'boutique'}
+          </span>
+          <span className="font-mono">{deviceId}</span>
+        </div>
+
+        <p className="text-[10px] gv-muted text-center leading-relaxed">
+          {isAr
+            ? 'كل عملية دخول تُسجَّل في سجل التدقيق. يُقفل الحساب مؤقتًا بعد 5 محاولات فاشلة.'
+            : 'Chaque connexion est inscrite au journal d\'audit. Le compte se verrouille 15 min après 5 échecs.'}
+        </p>
       </div>
     </div>
   );

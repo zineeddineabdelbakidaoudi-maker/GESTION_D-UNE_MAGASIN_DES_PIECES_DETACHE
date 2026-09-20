@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useStore } from '../store/useStore';
+import { notify } from '../lib/notify';
 import { invokeIpc } from '../api/electronBridge';
 import { formatDZD } from '@gestion-veloo/shared';
 import { 
@@ -173,7 +174,7 @@ export const PurchasesPage: React.FC = () => {
         items
       });
 
-      alert(isAr 
+      notify.success(isAr 
         ? 'تم تسجيل سند الشراء بنجاح وتحديث المخزون (رمز 90)!' 
         : 'Bon d\'achat enregistré avec succès et stock réassorti (Code 90) !'
       );
@@ -183,8 +184,8 @@ export const PurchasesPage: React.FC = () => {
       setPaymentType('cash');
       loadData();
       setActiveTab('history');
-    } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+    } catch (err) {
+      notify.error(err);
     } finally {
       setLoading(false);
     }

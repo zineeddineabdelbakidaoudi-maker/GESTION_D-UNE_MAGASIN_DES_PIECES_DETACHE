@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
+import { notify } from '../lib/notify';
 import { invokeIpc } from '../api/electronBridge';
 import { 
   Settings, 
@@ -180,8 +181,8 @@ export const SettingsPage: React.FC = () => {
       await invokeIpc('save-shortcuts', shortcuts);
       setShortcutsSaved(true);
       setTimeout(() => setShortcutsSaved(false), 2500);
-    } catch (err: any) {
-      alert(`Erreur raccourcis: ${err.message}`);
+    } catch (err) {
+      notify.error(err, 'Raccourcis non enregistrés');
     }
   };
 
@@ -198,8 +199,8 @@ export const SettingsPage: React.FC = () => {
       if (res && res.receiptText) {
         setTestPrintOutput(res.receiptText);
       }
-    } catch (err: any) {
-      alert(`Erreur impression test: ${err.message}`);
+    } catch (err) {
+      notify.error(err, 'Impression de test impossible');
     }
   };
 
@@ -224,8 +225,8 @@ export const SettingsPage: React.FC = () => {
 
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
-    } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+    } catch (err) {
+      notify.error(err);
     }
   };
 
@@ -239,8 +240,8 @@ export const SettingsPage: React.FC = () => {
         setNewCatName('');
         showMetaSuccess(`Catégorie "${res.name}" ajoutée !`);
       }
-    } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+    } catch (err) {
+      notify.error(err);
     }
   };
 
@@ -259,8 +260,8 @@ export const SettingsPage: React.FC = () => {
         setNewBrandName('');
         showMetaSuccess(`Marque "${res.name}" ajoutée !`);
       }
-    } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+    } catch (err) {
+      notify.error(err);
     }
   };
 
@@ -279,8 +280,8 @@ export const SettingsPage: React.FC = () => {
         setNewMotoName('');
         showMetaSuccess(`Machine "${res.name}" ajoutée !`);
       }
-    } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+    } catch (err) {
+      notify.error(err);
     }
   };
 
@@ -302,8 +303,8 @@ export const SettingsPage: React.FC = () => {
         setNewColorName('');
         showMetaSuccess(`Couleur "${res.name}" ajoutée !`);
       }
-    } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+    } catch (err) {
+      notify.error(err);
     }
   };
 

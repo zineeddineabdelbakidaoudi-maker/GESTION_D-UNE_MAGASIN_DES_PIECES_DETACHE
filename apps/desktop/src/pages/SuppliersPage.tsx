@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
+import { notify } from '../lib/notify';
 import { invokeIpc } from '../api/electronBridge';
 import { Supplier } from '@gestion-veloo/shared';
 import { formatDZD } from '@gestion-veloo/shared';
@@ -66,14 +67,14 @@ export const SuppliersPage: React.FC = () => {
     e.preventDefault();
     try {
       await invokeIpc('create-supplier', { name, phone, address });
-      alert(isAr ? 'تمت إضافة المورد بنجاح!' : 'Fournisseur créé avec succès !');
+      notify.success(isAr ? 'تمت إضافة المورد بنجاح!' : 'Fournisseur créé avec succès !');
       setShowAddModal(false);
       setName('');
       setPhone('');
       setAddress('');
       loadSuppliers();
-    } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+    } catch (err) {
+      notify.error(err);
     }
   };
 
@@ -88,14 +89,14 @@ export const SuppliersPage: React.FC = () => {
         note: versementNote || 'Règlement facture'
       });
 
-      alert(isAr ? 'تم تسجيل تسديد المورد بنجاح!' : 'Règlement fournisseur enregistré !');
+      notify.success(isAr ? 'تم تسجيل تسديد المورد بنجاح!' : 'Règlement fournisseur enregistré !');
       setShowVersementModal(false);
       setVersementAmount('');
       setVersementNote('');
       loadSuppliers();
       handleSelectSupplier(selectedSupplier);
-    } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+    } catch (err) {
+      notify.error(err);
     }
   };
 

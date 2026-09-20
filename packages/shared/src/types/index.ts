@@ -18,7 +18,7 @@ export interface User {
   username: string;
   passwordHash?: string;
   isActive: boolean;
-  role?: 'owner' | 'manager' | 'cashier';
+  role?: 'owner' | 'manager' | 'cashier' | 'auditor';
   createdAt: string;
   permissions?: Permission[];
 }

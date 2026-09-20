@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
+import { notify } from '../lib/notify';
 import { invokeIpc } from '../api/electronBridge';
 import { formatDZD } from '@gestion-veloo/shared';
 import { Calculator, CheckCircle2, Bookmark, Info, HelpCircle, Sparkles } from 'lucide-react';
@@ -41,7 +42,7 @@ export const ZakatPage: React.FC = () => {
       cashOnHand: cashCentimes
     };
     setSnapshots([newSnap, ...snapshots]);
-    alert(isAr ? 'تم أرشفة تقييم الزكاة بنجاح!' : 'Évaluation Zakat archivée avec succès !');
+    notify.success(isAr ? 'تم أرشفة تقييم الزكاة بنجاح!' : 'Évaluation Zakat archivée avec succès !');
   };
 
   return (

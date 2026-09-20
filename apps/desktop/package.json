@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "package": "tsc && vite build && electron-builder",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node tests/run.cjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@gestion-veloo/shared": "workspace:*",

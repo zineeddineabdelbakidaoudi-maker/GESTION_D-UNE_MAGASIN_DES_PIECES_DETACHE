@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useStore } from '../store/useStore';
+import { notify } from '../lib/notify';
 import { invokeIpc } from '../api/electronBridge';
 import { Product } from '@gestion-veloo/shared';
 import { formatDZD } from '@gestion-veloo/shared';
@@ -129,11 +130,11 @@ export const ProductsPage: React.FC = () => {
     const val = manualBarcode.trim();
     if (!val) return;
     if (barcodesList.length >= 5) {
-      alert(isAr ? 'الحد الأقصى 5 رموز شريطية لكل قطعة' : 'Maximum 5 codes-barres par produit');
+      notify.warn(isAr ? 'الحد الأقصى 5 رموز شريطية لكل قطعة' : 'Maximum 5 codes-barres par produit');
       return;
     }
     if (barcodesList.includes(val)) {
-      alert(isAr ? 'الرمز الشريطي موجود بالفعل' : 'Ce code-barres existe déjà');
+      notify.warn(isAr ? 'الرمز الشريطي موجود بالفعل' : 'Ce code-barres existe déjà');
       return;
     }
     setBarcodesList([...barcodesList, val]);
@@ -142,7 +143,7 @@ export const ProductsPage: React.FC = () => {
 
   const handleGenerateAutoBarcode = () => {
     if (barcodesList.length >= 5) {
-      alert(isAr ? 'الحد الأقصى 5 رموز شريطية لكل قطعة' : 'Maximum 5 codes-barres par produit');
+      notify.warn(isAr ? 'الحد الأقصى 5 رموز شريطية لكل قطعة' : 'Maximum 5 codes-barres par produit');
       return;
     }
     const tempNextId = (products.length || 0) + 1;
@@ -160,7 +161,7 @@ export const ProductsPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      alert(isAr ? 'حجم الصورة كبير جداً (أقصى حد 2 ميغا)' : 'Photo trop volumineuse (max 2 Mo)');
+      notify.warn(isAr ? 'حجم الصورة كبير جداً (أقصى حد 2 ميغا)' : 'Photo trop volumineuse (max 2 Mo)');
       return;
     }
     const reader = new FileReader();
@@ -184,10 +185,10 @@ export const ProductsPage: React.FC = () => {
         setSelectedColorId(res.id);
         setNewColorName('');
         setShowAddColorForm(false);
-        alert(isAr ? 'تمت إضافة اللون بنجاح' : `Couleur "${res.name}" ajoutée avec succès !`);
+        notify.success(isAr ? 'تمت إضافة اللون بنجاح' : `Couleur "${res.name}" ajoutée avec succès !`);
       }
-    } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+    } catch (err) {
+      notify.error(err);
     }
   };
 
@@ -230,19 +231,19 @@ export const ProductsPage: React.FC = () => {
         if (photoBase64) {
           await invokeIpc('update-product-photo', { productId: editingProduct.id, photoBase64 });
         }
-        alert(isAr ? 'تم تعديل المنتج بنجاح!' : 'Produit modifié avec succès !');
+        notify.success(isAr ? 'تم تعديل المنتج بنجاح!' : 'Produit modifié avec succès !');
       } else {
         const created = await invokeIpc<any>('create-product', payload);
         if (created?.id && photoBase64) {
           await invokeIpc('update-product-photo', { productId: created.id, photoBase64 });
         }
-        alert(isAr ? 'تمت إضافة المنتج بنجاح!' : 'Produit créé avec succès !');
+        notify.success(isAr ? 'تمت إضافة المنتج بنجاح!' : 'Produit créé avec succès !');
       }
       setShowAddModal(false);
       resetForm();
       loadData();
-    } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+    } catch (err) {
+      notify.error(err);
     }
   };
 
