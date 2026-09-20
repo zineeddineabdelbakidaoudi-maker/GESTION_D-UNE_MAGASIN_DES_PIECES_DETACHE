@@ -74,7 +74,9 @@ export const SettingsPage: React.FC = () => {
   const [rc, setRc] = useState('');
   const [articleImposition, setArticleImposition] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [avgPriceMode, setAvgPriceMode] = useState(true);
+  const [costThreshold, setCostThreshold] = useState(5);
+  const [lowStockAlert, setLowStockAlert] = useState(5);
+  const [allowNegativeStock, setAllowNegativeStock] = useState(false);
 
   // System Printers Detection
   const [availablePrinters, setAvailablePrinters] = useState<SystemPrinter[]>([]);
@@ -145,7 +147,9 @@ export const SettingsPage: React.FC = () => {
         setNis(s.nis || '');
         setRc(s.rc || '');
         setArticleImposition(s.articleImposition || s.article_imposition || '');
-        setAvgPriceMode(s.avg_price_mode !== 0);
+        setCostThreshold(s.cost_threshold ?? 5);
+        setLowStockAlert(s.low_stock_alert ?? 5);
+        setAllowNegativeStock(Boolean(s.allow_negative_stock));
       }
     });
 
@@ -220,7 +224,9 @@ export const SettingsPage: React.FC = () => {
         nis,
         rc,
         articleImposition,
-        avgPriceMode
+        costThreshold,
+        lowStockAlert,
+        allowNegativeStock
       });
 
       setSavedSuccess(true);
@@ -601,37 +607,83 @@ export const SettingsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Section: Prix Moyen Mode */}
-          <div className={`space-y-3 p-4 rounded-2xl border ${
+          {/* Section: Règles de valorisation & de stock */}
+          <div className={`space-y-4 p-4 rounded-2xl border ${
             isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
           }`}>
             <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              {isAr ? 'حساب سعر الشراء' : 'Calcul du Prix d\'Achat'}
+              {isAr ? 'قواعد المخزون وسعر الشراء' : "Règles de stock & de prix d'achat"}
             </h4>
+
+            <div className={`p-3 rounded-xl text-[11px] leading-relaxed ${
+              isDark ? 'bg-blue-950/40 border border-blue-900/50 text-blue-200' : 'bg-blue-50 border border-blue-200 text-blue-800'
+            }`}>
+              {isAr
+                ? `عند كل عملية شراء : إذا كان المخزون المتبقي قبل الاستلام أقل من ${costThreshold} وحدة، يصبح سعر الشراء الجديد هو المعتمد. وإلا يُحتسب متوسط السعر القديم والجديد.`
+                : `À chaque réception : si le stock restant avant l'achat est inférieur à ${costThreshold} unité(s), le nouveau prix d'achat devient dominant. Au-delà, le prix retenu est la médiane entre l'ancien et le nouveau.`}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={`text-[11px] font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  {isAr ? 'عتبة السعر المهيمن (وحدات)' : 'Seuil « nouveau prix dominant » (unités)'}
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={costThreshold}
+                  onChange={e => setCostThreshold(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                  className={`w-full mt-1.5 border rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold outline-none ${
+                    isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                  }`}
+                />
+                <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+                  {isAr ? 'القيمة الموصى بها : 5' : 'Valeur recommandée : 5'}
+                </p>
+              </div>
+
+              <div>
+                <label className={`text-[11px] font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  {isAr ? 'تنبيه المخزون المنخفض' : 'Alerte stock bas (par défaut)'}
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={lowStockAlert}
+                  onChange={e => setLowStockAlert(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                  className={`w-full mt-1.5 border rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold outline-none ${
+                    isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                  }`}
+                />
+                <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+                  {isAr ? 'يُستعمل عندما لا يحدَّد حد أدنى للقطعة' : "Utilisé quand aucun minimum n'est défini sur l'article"}
+                </p>
+              </div>
+            </div>
+
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  {isAr ? 'متوسط سعر الشراء عند استلام البضاعة' : 'Moyenne du prix d\'achat lors d\'une réception de stock'}
+                  {isAr ? 'السماح بمخزون سالب' : 'Autoriser la vente en stock négatif'}
                 </p>
                 <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {avgPriceMode
-                    ? (isAr ? '✅ مفعّل — سعر جديد = (القديم + الجديد) ÷ 2' : '✅ Activé — Nouveau prix = (ancien + nouveau) ÷ 2')
-                    : (isAr ? '❌ معطّل — يُؤخذ سعر الشراء الجديد مباشرة' : '❌ Désactivé — le nouveau prix d\'achat remplace l\'ancien')
-                  }
+                  {allowNegativeStock
+                    ? (isAr ? '⚠️ مفعّل — يمكن البيع دون توفر المخزون' : '⚠️ Activé — une vente peut passer même sans stock disponible')
+                    : (isAr ? '✅ معطّل — يُرفض البيع عند نفاد المخزون' : '✅ Désactivé — toute vente dépassant le stock est refusée')}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setAvgPriceMode(!avgPriceMode)}
+                onClick={() => setAllowNegativeStock(!allowNegativeStock)}
                 className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs border transition-all ${
-                  avgPriceMode
-                    ? (isDark ? 'bg-amber-950/50 border-amber-700/50 text-amber-300' : 'bg-amber-50 border-amber-300 text-amber-700')
-                    : (isDark ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-300 text-slate-500')
+                  allowNegativeStock
+                    ? (isDark ? 'bg-rose-950/50 border-rose-700/50 text-rose-300' : 'bg-rose-50 border-rose-300 text-rose-700')
+                    : (isDark ? 'bg-emerald-950/40 border-emerald-800/50 text-emerald-300' : 'bg-emerald-50 border-emerald-300 text-emerald-700')
                 }`}
               >
-                {avgPriceMode ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
-                {avgPriceMode ? (isAr ? 'مفعّل' : 'Activé') : (isAr ? 'معطّل' : 'Désactivé')}
+                {allowNegativeStock ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
+                {allowNegativeStock ? (isAr ? 'مفعّل' : 'Activé') : (isAr ? 'معطّل' : 'Désactivé')}
               </button>
             </div>
           </div>

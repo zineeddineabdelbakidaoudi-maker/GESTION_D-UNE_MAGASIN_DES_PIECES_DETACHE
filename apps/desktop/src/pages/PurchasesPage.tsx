@@ -2,7 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { notify } from '../lib/notify';
 import { invokeIpc } from '../api/electronBridge';
-import { formatDZD } from '@gestion-veloo/shared';
+import { formatDZD, resolvePurchaseCost, COST_STRATEGY_LABELS, LOW_STOCK_COST_THRESHOLD } from '@gestion-veloo/shared';
+import { Modal } from '../components/ui';
 import { 
   Truck, 
   Plus, 
@@ -26,7 +27,9 @@ interface PurchaseItemInput {
   productCode: string;
   qty: number;
   unitCost: number; // centimes
-  useAvgPrice?: boolean; // toggle prix moyen pour ce produit
+  /** Stock et coût relevés à l'instant de l'ajout, pour la simulation de la règle. */
+  stockBefore: number;
+  currentCost: number;
 }
 
 export const PurchasesPage: React.FC = () => {
@@ -54,6 +57,8 @@ export const PurchasesPage: React.FC = () => {
   const [itemCostDZD, setItemCostDZD] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [historySearch, setHistorySearch] = useState('');
+  const [costThreshold, setCostThreshold] = useState(LOW_STOCK_COST_THRESHOLD);
+  const [costReport, setCostReport] = useState<any[] | null>(null);
 
   const loadData = async () => {
     try {
@@ -65,6 +70,9 @@ export const PurchasesPage: React.FC = () => {
       setSuppliers(supps || []);
       setProducts(prods || []);
       setPurchasesHistory(history || []);
+
+      const settings = await invokeIpc<any>('get-settings', currentStore?.id || 1).catch(() => null);
+      if (settings?.cost_threshold != null) setCostThreshold(settings.cost_threshold);
     } catch (err) {
       console.error(err);
     }
@@ -119,11 +127,15 @@ export const PurchasesPage: React.FC = () => {
     const qty = parseInt(itemQty, 10) || 1;
     const unitCost = Math.round((parseFloat(itemCostDZD) || 0) * 100);
 
+    const stockBefore = (selectedProduct.stock || []).reduce(
+      (sum: number, st: any) => sum + (st.storeId === currentStore?.id || !currentStore ? st.quantity || 0 : 0),
+      0
+    );
+
     const existingIndex = items.findIndex(it => it.productId === selectedProduct.id);
     if (existingIndex > -1) {
       const updated = [...items];
-      updated[existingIndex].qty += qty;
-      updated[existingIndex].unitCost = unitCost;
+      updated[existingIndex] = { ...updated[existingIndex], qty: updated[existingIndex].qty + qty, unitCost };
       setItems(updated);
     } else {
       setItems([
@@ -134,7 +146,8 @@ export const PurchasesPage: React.FC = () => {
           productCode: selectedProduct.code,
           qty,
           unitCost,
-          useAvgPrice: true // default: use avg price
+          stockBefore,
+          currentCost: selectedProduct.priceAchat || 0
         }
       ]);
     }
@@ -142,11 +155,17 @@ export const PurchasesPage: React.FC = () => {
     handleClearSelectedProduct();
   };
 
-  const toggleAvgPrice = (idx: number) => {
-    const updated = [...items];
-    updated[idx] = { ...updated[idx], useAvgPrice: !updated[idx].useAvgPrice };
-    setItems(updated);
-  };
+  /**
+   * Simulation locale de la règle officielle, avec les mêmes paramètres que le
+   * process principal : ce que l'écran annonce est exactement ce qui sera écrit.
+   */
+  const previewCost = (it: PurchaseItemInput) =>
+    resolvePurchaseCost({
+      stockBefore: it.stockBefore,
+      currentCost: it.currentCost,
+      incomingCost: it.unitCost,
+      threshold: costThreshold
+    });
 
   const handleRemoveItem = (index: number) => {
     setItems(items.filter((_, idx) => idx !== index));
@@ -435,6 +454,15 @@ export const PurchasesPage: React.FC = () => {
                 <span className="font-mono text-emerald-400 font-bold">{formatDZD(subtotalCentimes)}</span>
               </div>
 
+              <div className="px-4 py-2 bg-slate-950/60 border-b border-slate-800 text-[10px] text-slate-400 flex items-center gap-2">
+                <AlertCircle className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span>
+                  {isAr
+                    ? `قاعدة سعر الشراء : إذا كان المخزون قبل الشراء أقل من ${costThreshold} فالسعر الجديد هو المعتمد، وإلا فمتوسط السعرين.`
+                    : `Règle du prix d'achat : stock avant réception < ${costThreshold} ⇒ le nouveau prix devient dominant ; sinon médiane entre l'ancien et le nouveau.`}
+                </span>
+              </div>
+
               {items.length === 0 ? (
                 <div className="p-8 text-center text-slate-500 text-xs font-medium">
                   {isAr ? 'لم تتم إضافة أي قطع بعد' : 'Aucun article ajouté au bon d\'achat pour le moment.'}
@@ -448,9 +476,8 @@ export const PurchasesPage: React.FC = () => {
                       <th className="px-4 py-2.5 text-center">{isAr ? 'الكمية' : 'Qté'}</th>
                       <th className="px-4 py-2.5 text-right">{isAr ? 'سعر الشراء' : 'Prix Unitaire'}</th>
                       <th className="px-4 py-2.5 text-right">{isAr ? 'المجموع' : 'Total Ligne'}</th>
-                      <th className="px-4 py-2.5 text-center" title="Activer le calcul de Prix Moyen pour ce produit">
-                        <span className="text-[10px] text-blue-400">⌀ Moy.</span>
-                      </th>
+                      <th className="px-4 py-2.5 text-center">{isAr ? 'المخزون' : 'Stock av. → ap.'}</th>
+                      <th className="px-4 py-2.5 text-right">{isAr ? 'سعر الشراء الجديد' : "Nouveau prix d'achat"}</th>
                       <th className="px-4 py-2.5 text-center"></th>
                     </tr>
                   </thead>
@@ -462,19 +489,41 @@ export const PurchasesPage: React.FC = () => {
                         <td className="px-4 py-3 text-center font-mono font-bold text-emerald-400">+{it.qty}</td>
                         <td className="px-4 py-3 text-right font-mono text-slate-300">{formatDZD(it.unitCost)}</td>
                         <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">{formatDZD(it.qty * it.unitCost)}</td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => toggleAvgPrice(idx)}
-                            title={it.useAvgPrice ? 'Prix Moyen activé — cliquer pour désactiver' : 'Prix Moyen désactivé — cliquer pour activer'}
-                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-all ${
-                              it.useAvgPrice
-                                ? 'bg-blue-600/20 text-blue-400 border-blue-500/40 hover:bg-blue-600/30'
-                                : 'bg-slate-800 text-slate-500 border-slate-700 hover:bg-slate-700'
-                            }`}
-                          >
-                            {it.useAvgPrice ? '⌀ ON' : '⌀ OFF'}
-                          </button>
+                        <td className="px-4 py-3 text-center font-mono text-[11px]">
+                          <span className={it.stockBefore < costThreshold ? 'text-amber-400 font-bold' : 'text-slate-400'}>
+                            {it.stockBefore}
+                          </span>
+                          <span className="text-slate-600 mx-1">→</span>
+                          <span className="text-emerald-400 font-bold">{it.stockBefore + it.qty}</span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {(() => {
+                            const res = previewCost(it);
+                            const changed = res.newCost !== res.previousCost;
+                            return (
+                              <div title={res.reason}>
+                                <div className="font-mono font-bold text-blue-400">{formatDZD(res.newCost)}</div>
+                                <div className="text-[10px] text-slate-500">
+                                  {changed && <span className="line-through me-1">{formatDZD(res.previousCost)}</span>}
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded font-bold ${
+                                      res.strategy === 'dominant'
+                                        ? 'bg-amber-500/15 text-amber-400'
+                                        : res.strategy === 'median'
+                                          ? 'bg-blue-500/15 text-blue-400'
+                                          : 'bg-slate-700/50 text-slate-400'
+                                    }`}
+                                  >
+                                    {res.strategy === 'dominant'
+                                      ? (isAr ? 'السعر الجديد يغلب' : 'Dominant')
+                                      : res.strategy === 'median'
+                                        ? (isAr ? 'المتوسط' : 'Médiane')
+                                        : COST_STRATEGY_LABELS[res.strategy]}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <button
@@ -691,6 +740,70 @@ export const PurchasesPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Récapitulatif renvoyé par le process principal après enregistrement */}
+      <Modal
+        open={Boolean(costReport)}
+        title={isAr ? 'أثر الشراء على أسعار الشراء' : "Impact du bon d'achat sur les prix d'achat"}
+        subtitle={
+          isAr
+            ? 'ما تم تسجيله فعليًا في قاعدة البيانات'
+            : `Règle appliquée ligne par ligne, telle qu'enregistrée (seuil : ${costThreshold} unités).`
+        }
+        icon={Layers}
+        width="max-w-3xl"
+        onClose={() => { setCostReport(null); setActiveTab('history'); }}
+        footer={
+          <button className="gv-btn-primary" onClick={() => { setCostReport(null); setActiveTab('history'); }}>
+            {isAr ? 'حسنًا' : "Voir l'historique"}
+          </button>
+        }
+      >
+        {costReport && costReport.length > 0 ? (
+          <div className="gv-card-flat !p-0 overflow-hidden">
+            <table className="gv-table">
+              <thead>
+                <tr>
+                  <th>{isAr ? 'القطعة' : 'Article'}</th>
+                  <th className="text-center">{isAr ? 'المخزون' : 'Stock'}</th>
+                  <th className="text-right">{isAr ? 'السعر السابق' : 'Ancien prix'}</th>
+                  <th className="text-right">{isAr ? 'سعر الفاتورة' : 'Prix reçu'}</th>
+                  <th className="text-right">{isAr ? 'السعر المعتمد' : 'Prix retenu'}</th>
+                  <th>{isAr ? 'القاعدة' : 'Règle'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {costReport.map((r: any, i: number) => (
+                  <tr key={i}>
+                    <td>
+                      <div className="font-bold">{r.name}</div>
+                      <div className="text-[10px] gv-muted font-mono">{r.code}</div>
+                    </td>
+                    <td className="text-center font-mono text-[11px]">
+                      <span className={r.stockBefore < costThreshold ? 'text-amber-500 font-bold' : ''}>{r.stockBefore}</span>
+                      <span className="gv-muted mx-1">→</span>
+                      <span className="text-emerald-500 font-bold">{r.stockAfter}</span>
+                    </td>
+                    <td className="text-right font-mono gv-muted">{formatDZD(r.previousCost)}</td>
+                    <td className="text-right font-mono">{formatDZD(r.incomingCost)}</td>
+                    <td className="text-right font-mono font-black text-blue-500">{formatDZD(r.newCost)}</td>
+                    <td className="text-[10px] leading-snug max-w-[16rem]">
+                      <span className={r.strategy === 'dominant' ? 'gv-badge-warning' : r.strategy === 'median' ? 'gv-badge-accent' : 'gv-badge-neutral'}>
+                        {COST_STRATEGY_LABELS[r.strategy as keyof typeof COST_STRATEGY_LABELS]}
+                      </span>
+                      <div className="gv-muted mt-1">{r.reason}</div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-xs gv-muted">
+            {isAr ? 'لم يتغير أي سعر شراء.' : "Aucun prix d'achat n'a changé sur ce bon."}
+          </p>
+        )}
+      </Modal>
     </div>
   );
 };
