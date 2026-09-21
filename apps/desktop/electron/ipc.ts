@@ -1342,7 +1342,10 @@ export function registerIpcHandlers() {
     const storeId = ctx.scopeStore(params?.storeId);
     const args: any[] = [];
     let sql = `
-      SELECT d.*, ec.name as categoryName, u.full_name as userName, st.name as storeName
+      SELECT d.id, d.amount, d.note,
+             d.store_id as storeId, d.category_id as categoryId, d.user_id as userId,
+             d.depense_date as depenseDate, d.created_at as createdAt,
+             ec.name as categoryName, u.full_name as userName, st.name as storeName
       FROM depenses d
       JOIN expense_categories ec ON d.category_id = ec.id
       LEFT JOIN users u ON d.user_id = u.id

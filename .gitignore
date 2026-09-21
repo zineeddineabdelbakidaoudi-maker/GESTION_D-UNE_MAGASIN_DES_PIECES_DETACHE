@@ -23,3 +23,4 @@ livraison
 
 # Sortie de build alternative (utilisee quand release/ est verrouille)
 apps/desktop/release2
+apps/desktop/release3

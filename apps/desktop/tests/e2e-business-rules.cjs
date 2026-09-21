@@ -160,6 +160,13 @@ const costOf = (pid) => DB.prepare('SELECT price_achat c FROM products WHERE id=
     check('suppression d une categorie utilisee', 'acceptee', 'refusee');
   } catch (e) { check('suppression d une categorie utilisee refusee', e.message.includes('utilisent encore'), true); }
 
+  section('Forme des depenses renvoyees a l ecran');
+  const listeDep = await call('get-depenses', { storeId: STORE });
+  const dep = listeDep[0];
+  check('date exploitable par l interface', Number.isFinite(Date.parse(dep.depenseDate)), true);
+  check('categorie identifiee', typeof dep.categoryId, 'number');
+  check('libelle de categorie present', typeof dep.categoryName, 'string');
+
   section('Tri du catalogue');
   const catalogue = await call('get-products', {});
   const ids = catalogue.map(p => p.id);

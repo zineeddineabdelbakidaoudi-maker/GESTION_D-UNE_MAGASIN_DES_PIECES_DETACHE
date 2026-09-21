@@ -38,16 +38,27 @@ if ($null -eq $proc) {
     exit 1
 }
 
-[void][Drv]::ShowWindow($proc.MainWindowHandle, 3)
-[void][Drv]::SetForegroundWindow($proc.MainWindowHandle)
-Start-Sleep -Milliseconds 600
+# Windows refuse parfois la mise au premier plan à un processus qui n'a pas le
+# focus. L'appui bref sur ALT lève cette restriction ; on réessaie plusieurs fois.
+$actif = $false
+for ($i = 0; $i -lt 6 -and -not $actif; $i++) {
+    [void][Drv]::ShowWindow($proc.MainWindowHandle, 3)
+    [System.Windows.Forms.SendKeys]::SendWait("%")
+    [void][Drv]::SetForegroundWindow($proc.MainWindowHandle)
+    Start-Sleep -Milliseconds 400
+    $actif = ([Drv]::GetForegroundWindow() -eq $proc.MainWindowHandle)
+}
 
-# La fenêtre doit réellement avoir le focus, sinon les touches partiraient
-# dans une autre application.
-if ([Drv]::GetForegroundWindow() -ne $proc.MainWindowHandle) {
+# Sans le focus, les touches partiraient dans une autre application.
+if (-not $actif) {
     Write-Error "Impossible de mettre la fenetre au premier plan."
     exit 1
 }
+
+# L'appui sur ALT a pu ouvrir la barre de menus : on la referme avant d'envoyer
+# quoi que ce soit, sinon les touches iraient dans le menu.
+[System.Windows.Forms.SendKeys]::SendWait("{ESC}")
+Start-Sleep -Milliseconds 250
 
 if ($ClickX -ge 0 -and $ClickY -ge 0) {
     $origin = New-Object Drv+POINT
