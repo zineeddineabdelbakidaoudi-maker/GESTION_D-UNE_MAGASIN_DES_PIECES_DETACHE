@@ -17,3 +17,6 @@ src-tauri/target
 coverage
 .vscode
 .idea
+
+# Dossier de livraison client (genere par scripts/package-livraison.mjs)
+livraison

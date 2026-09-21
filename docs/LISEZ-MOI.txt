@@ -1,0 +1,97 @@
+===============================================================================
+  GESTION PIECES CYCLES & MOTOS  --  Logiciel de caisse et de gestion
+  Version 2.0.0
+===============================================================================
+
+CONTENU DE CE DOSSIER
+-------------------------------------------------------------------------------
+  Installation\Gestion-POS-Setup-2.0.0.exe
+      Programme d'installation. C'est la methode recommandee : il cree un
+      raccourci sur le bureau et dans le menu Demarrer.
+
+  Installation\Gestion-POS-Portable-2.0.0.exe
+      Version portable. Se lance directement, sans installation, depuis un
+      dossier ou une cle USB.
+
+  Documentation\Guide-Installation-et-Demarrage.pdf
+      Mise en service complete : installation, comptes, droits, imprimante,
+      regles de stock, liaison au portail, sauvegarde.
+
+  Documentation\Guide-Tests-et-Depannage.pdf
+      Recette a executer apres installation (14 verifications) et resolution
+      des incidents courants.
+
+
+DEMARRAGE EN 5 ETAPES
+-------------------------------------------------------------------------------
+  1. Ouvrez le dossier "Installation" et lancez le fichier Setup.
+     Si Windows affiche "Windows a protege votre ordinateur", cliquez sur
+     "Informations complementaires" puis "Executer quand meme". Cet
+     avertissement vient de l'absence de certificat commercial, pas d'un
+     probleme du fichier.
+
+  2. Lancez le logiciel et connectez-vous :
+
+         Identifiant : admin
+         Mot de passe : admin123
+
+  3. CHANGEZ CE MOT DE PASSE IMMEDIATEMENT.
+     Menu a votre nom, en haut a droite -> "Changer mon mot de passe".
+     Deux autres comptes existent (vendeur1 / vendeur2, mot de passe
+     vendeur123) : changez-les aussi, ou desactivez-les.
+
+  4. Onglet "Parametres" : renseignez le nom du magasin, l'adresse, le
+     telephone, le NIF / NIS / RC et le pied de page du ticket. Selectionnez
+     ensuite votre imprimante ticket.
+
+  5. Onglet "Utilisateurs" : creez un compte par vendeur, avec le role
+     "Caissier". Un caissier ne voit ni les prix d'achat ni les benefices.
+
+  Avant la premiere vraie vente, executez la recette du
+  Guide-Tests-et-Depannage.pdf (chapitre 2). Elle prend 20 minutes et
+  verifie que les calculs de stock et de benefice sont justes sur ce poste.
+
+
+A SAVOIR
+-------------------------------------------------------------------------------
+  * Le logiciel fonctionne entierement HORS LIGNE. Une coupure d'internet
+    n'interrompt jamais la vente.
+
+  * REGLE DU PRIX D'ACHAT, appliquee a chaque reception de marchandise :
+        - stock restant avant l'achat INFERIEUR a 5  -> le nouveau prix
+          d'achat devient dominant (il remplace l'ancien) ;
+        - stock restant SUPERIEUR OU EGAL a 5        -> mediane, soit
+          (ancien prix + nouveau prix) / 2.
+    Le seuil de 5 est modifiable dans les Parametres.
+
+  * Le cout de revient est fige sur chaque ligne de vente au moment de
+    l'encaissement : modifier un prix d'achat plus tard ne change jamais un
+    benefice deja realise.
+
+  * Toutes les operations sont inscrites dans un JOURNAL D'AUDIT consultable
+    par le proprietaire : qui a fait quoi, quand, et avec quelles valeurs
+    avant / apres.
+
+
+SAUVEGARDE  --  A NE PAS NEGLIGER
+-------------------------------------------------------------------------------
+  Toute l'activite du magasin tient dans un seul fichier.
+
+  1. Fermez completement le logiciel.
+  2. Dans l'Explorateur Windows, collez ce chemin dans la barre d'adresse :
+
+         %APPDATA%\@gestion-veloo\desktop
+
+  3. Copiez le fichier pos_local.sqlite (ainsi que les fichiers -wal et -shm
+     s'ils sont presents) sur une cle USB, dans un dossier date.
+
+  Une fois par semaine, et systematiquement avant une mise a jour.
+
+
+CONFIGURATION REQUISE
+-------------------------------------------------------------------------------
+  Windows 10 ou 11 64 bits  --  4 Go de memoire  --  500 Mo d'espace disque
+  Ecran 1366 x 768 minimum (1920 x 1080 recommande)
+  Douchette USB et imprimante ticket 80 mm : optionnelles
+
+===============================================================================

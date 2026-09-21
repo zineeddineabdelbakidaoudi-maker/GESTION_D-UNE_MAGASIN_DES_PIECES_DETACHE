@@ -1,6 +1,6 @@
 {
   "name": "@gestion-veloo/desktop",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
@@ -49,7 +49,7 @@
   },
   "build": {
     "appId": "com.gestionveloo.pos",
-    "productName": "Gestion Pièces Cycles & Motos POS",
+    "productName": "Gestion Pieces Cycles et Motos POS",
     "npmRebuild": false,
     "directories": {
       "output": "release"
@@ -67,7 +67,20 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Gestion POS",
+      "artifactName": "Gestion-POS-Setup-${version}.${ext}"
+    },
+    "artifactName": "Gestion-POS-${version}-${os}-${arch}-${ext}",
+    "portable": {
+      "artifactName": "Gestion-POS-Portable-${version}.${ext}"
     }
+  },
+  "description": "Logiciel de caisse et de gestion commerciale pour magasins de pièces cycles et motos",
+  "author": {
+    "name": "Gestion Pièces Cycles & Motos"
   }
 }
