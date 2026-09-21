@@ -251,7 +251,8 @@ export function registerIpcHandlers() {
     }
     if (categoryId) { sql += ' AND p.category_id = ?'; args.push(categoryId); }
     if (colorId) { sql += ' AND pc.color_id = ?'; args.push(colorId); }
-    sql += ` ORDER BY ${sort === 'az' ? 'p.name ASC' : 'p.id DESC'}`;
+    // Le catalogue se lit dans l'ordre des références : ART-00001, ART-00002, …
+    sql += ` ORDER BY ${sort === 'az' ? 'p.name ASC' : 'p.id ASC'}`;
 
     const rows = ctx.db.prepare(sql).all(...args) as any[];
 
@@ -518,7 +519,7 @@ export function registerIpcHandlers() {
       args.push(like, like, like);
     }
     if (params?.lowOnly) sql += ' AND ps.quantity <= MAX(p.min_stock, 0)';
-    sql += ' ORDER BY p.id DESC';
+    sql += ' ORDER BY p.id ASC';
 
     const rows = ctx.db.prepare(sql).all(...args) as any[];
     const lastMoveStmt = ctx.db.prepare(`
@@ -1307,6 +1308,34 @@ export function registerIpcHandlers() {
     } catch {
       throw new Error('Cette catégorie existe déjà.');
     }
+  });
+
+  secure('delete-expense-category', { module: 'depenses', action: 'edit' }, (ctx, payload: any) => {
+    const id = positiveInt(typeof payload === 'number' ? payload : payload?.id, 'catégorie');
+    const row = ctx.db.prepare('SELECT name FROM expense_categories WHERE id = ?').get(id) as any;
+    if (!row) throw new Error('Catégorie introuvable.');
+
+    // Une catégorie encore utilisée ne peut pas disparaître : les dépenses
+    // historiques perdraient leur libellé et les rapports deviendraient faux.
+    const used = (ctx.db.prepare('SELECT COUNT(*) as cnt FROM depenses WHERE category_id = ?').get(id) as any)?.cnt || 0;
+    if (used > 0) {
+      throw new Error(
+        `Suppression impossible : ${used} dépense(s) utilisent encore « ${row.name} ». ` +
+        'Reclassez-les avant de supprimer cette catégorie.'
+      );
+    }
+
+    const remaining = (ctx.db.prepare('SELECT COUNT(*) as cnt FROM expense_categories').get() as any)?.cnt || 0;
+    if (remaining <= 1) throw new Error('Il doit rester au moins une catégorie de dépense.');
+
+    ctx.db.prepare('DELETE FROM expense_categories WHERE id = ?').run(id);
+    recordAudit({
+      actor: ctx.actor, action: 'metadata.deleted', module: 'depenses',
+      entityType: 'expense_category', entityId: id, severity: 'warning',
+      summary: `Catégorie de dépense supprimée : ${row.name}`,
+      storeId: ctx.session.storeId
+    }, ctx.db);
+    return { success: true };
   });
 
   secure('get-depenses', { module: 'depenses', action: 'view' }, (ctx, params: any) => {

@@ -25,7 +25,8 @@ const ALLOWED_CHANNELS = new Set<string>([
   'get-clients', 'create-client', 'update-client', 'create-client-versement', 'get-client-transactions',
   'get-suppliers', 'create-supplier', 'create-supplier-versement', 'get-supplier-transactions',
   // Dépenses
-  'get-expense-categories', 'add-expense-category', 'get-depenses', 'create-depense',
+  'get-expense-categories', 'add-expense-category', 'delete-expense-category',
+  'get-depenses', 'create-depense',
   'delete-depense', 'get-depenses-total',
   // Rapports & paramètres
   'get-reports', 'get-settings', 'save-settings', 'get-shortcuts', 'save-shortcuts',

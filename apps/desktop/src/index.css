@@ -8,13 +8,16 @@
    ============================================================ */
 
 :root {
-  --gv-bg: 248 250 252;
-  --gv-surface: 255 255 255;
-  --gv-surface-2: 241 245 249;
-  --gv-border: 226 232 240;
-  --gv-border-strong: 203 213 225;
-  --gv-text: 15 23 42;
-  --gv-text-muted: 100 116 139;
+  /* Mode clair « crème » : le blanc pur fatigue sur un écran de caisse allumé
+     toute la journée. Les surfaces sont légèrement chaudes et désaturées, le
+     texte reste un gris-bleu sombre pour garder un contraste franc. */
+  --gv-bg: 245 242 235;
+  --gv-surface: 253 251 246;
+  --gv-surface-2: 240 236 227;
+  --gv-border: 228 222 210;
+  --gv-border-strong: 209 201 185;
+  --gv-text: 32 30 26;
+  --gv-text-muted: 112 105 93;
 
   --gv-accent: 37 99 235;
   --gv-accent-soft: 219 234 254;
@@ -29,17 +32,17 @@
   /* Échelle « slate » en mode clair : l'ordre est inversé par rapport au mode
      sombre, si bien qu'un `bg-slate-900` (surface sombre) devient une surface
      claire, et un `text-slate-100` (texte clair) devient un texte foncé. */
-  --s-950: 248 250 252;
-  --s-900: 255 255 255;
-  --s-800: 241 245 249;
-  --s-700: 214 222 232;
-  --s-600: 176 190 205;
-  --s-500: 130 145 165;
-  --s-400: 90 105 125;
-  --s-300: 51 65 85;
-  --s-200: 30 41 59;
-  --s-100: 15 23 42;
-  --s-50: 2 6 23;
+  --s-950: 245 242 235;
+  --s-900: 253 251 246;
+  --s-800: 240 236 227;
+  --s-700: 224 217 204;
+  --s-600: 186 177 161;
+  --s-500: 141 133 119;
+  --s-400: 101 94 82;
+  --s-300: 58 54 47;
+  --s-200: 40 37 32;
+  --s-100: 32 30 26;
+  --s-50: 18 17 15;
 
 
   /* Teintes d'accent — mode clair : les nuances pensees pour un fond sombre

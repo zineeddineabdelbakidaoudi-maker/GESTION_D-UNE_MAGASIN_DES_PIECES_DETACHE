@@ -139,6 +139,38 @@ const costOf = (pid) => DB.prepare('SELECT price_achat c FROM products WHERE id=
   await call('adjust-stock', { productId: pLow.id, storeId: STORE, newQuantity: 30, note: 'Inventaire physique (test)' });
   check('stock apres ajustement', stockOf(pLow.id, STORE), 30);
 
+  section('Categories de depenses');
+  const catsBefore = await call('get-expense-categories', {});
+  const newCat = await call('add-expense-category', 'TEST CATEGORIE JETABLE');
+  check('categorie ajoutee', typeof newCat.id === 'number', true);
+
+  try {
+    await call('add-expense-category', 'TEST CATEGORIE JETABLE');
+    check('doublon de categorie', 'accepte', 'refuse');
+  } catch (e) { check('doublon de categorie refuse', e.message.includes('existe'), true); }
+
+  await call('delete-expense-category', { id: newCat.id });
+  const catsAfter = await call('get-expense-categories', {});
+  check('categorie supprimee', catsAfter.length, catsBefore.length);
+
+  const usedCat = await call('add-expense-category', 'TEST CATEGORIE UTILISEE');
+  await call('create-depense', { storeId: STORE, categoryId: usedCat.id, amount: 50000, note: 'test' });
+  try {
+    await call('delete-expense-category', { id: usedCat.id });
+    check('suppression d une categorie utilisee', 'acceptee', 'refusee');
+  } catch (e) { check('suppression d une categorie utilisee refusee', e.message.includes('utilisent encore'), true); }
+
+  section('Tri du catalogue');
+  const catalogue = await call('get-products', {});
+  const ids = catalogue.map(p => p.id);
+  const croissant = ids.every((v, i) => i === 0 || ids[i - 1] <= v);
+  check('articles tries par identifiant croissant', croissant, true);
+  check('premier article = plus petit identifiant', ids[0], Math.min(...ids));
+
+  const stock = await call('get-stock', { storeId: STORE });
+  const stockIds = stock.map(r => r.productId);
+  check('stock trie par identifiant croissant', stockIds.every((v, i) => i === 0 || stockIds[i - 1] <= v), true);
+
   section('Journal audit');
   const journal = await call('get-audit-log', { limit: 300 });
   const actions = journal.entries.map(e => e.action);

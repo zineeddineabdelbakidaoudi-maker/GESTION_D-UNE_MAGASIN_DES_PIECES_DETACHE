@@ -1,6 +1,8 @@
 ﻿import React, { useEffect, useState, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 import { invokeIpc } from '../api/electronBridge';
+import { notify } from '../lib/notify';
+import { Modal, ConfirmDialog } from '../components/ui';
 import { formatDZD } from '@gestion-veloo/shared';
 import {
   Receipt,
@@ -12,7 +14,9 @@ import {
   CalendarDays,
   Tag,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Settings2,
+  Loader2
 } from 'lucide-react';
 
 interface ExpenseCategory {
@@ -43,6 +47,13 @@ export const DepensesPage: React.FC = () => {
   const [totalMonth, setTotalMonth] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  // Gestionnaire des catégories
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [categoryBusy, setCategoryBusy] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<ExpenseCategory | null>(null);
+  const [categoryUsage, setCategoryUsage] = useState<Record<number, number>>({});
+
   // Filters
   const [filterCategory, setFilterCategory] = useState<number | ''>('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
@@ -57,6 +68,70 @@ export const DepensesPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+
+  /**
+   * Compte les dépenses rattachées à chaque catégorie. Le décompte permet
+   * d'expliquer à l'écran pourquoi une catégorie n'est pas supprimable, plutôt
+   * que de laisser l'utilisateur buter sur un refus.
+   */
+  const refreshCategoryUsage = useCallback(async (cats: ExpenseCategory[]) => {
+    const all = await invokeIpc<Depense[]>('get-depenses', {}).catch(() => [] as Depense[]);
+    const counts: Record<number, number> = {};
+    for (const c of cats) counts[c.id] = 0;
+    for (const d of all || []) {
+      counts[d.categoryId] = (counts[d.categoryId] || 0) + 1;
+    }
+    setCategoryUsage(counts);
+  }, []);
+
+  const handleAddCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name) return;
+    setCategoryBusy(true);
+    try {
+      await invokeIpc('add-expense-category', name);
+      notify.success(
+        isAr ? 'تمت إضافة الفئة' : 'Catégorie ajoutée',
+        isAr ? undefined : name
+      );
+      setNewCategoryName('');
+      const cats = await invokeIpc<ExpenseCategory[]>('get-expense-categories');
+      setCategories(cats || []);
+      refreshCategoryUsage(cats || []);
+    } catch (err) {
+      notify.error(err, isAr ? 'تعذّرت إضافة الفئة' : "Ajout impossible");
+    } finally {
+      setCategoryBusy(false);
+    }
+  };
+
+  const handleDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+    setCategoryBusy(true);
+    try {
+      await invokeIpc('delete-expense-category', { id: categoryToDelete.id });
+      notify.success(
+        isAr ? 'تم حذف الفئة' : 'Catégorie supprimée',
+        isAr ? undefined : categoryToDelete.name
+      );
+      setCategoryToDelete(null);
+      const cats = await invokeIpc<ExpenseCategory[]>('get-expense-categories');
+      setCategories(cats || []);
+      refreshCategoryUsage(cats || []);
+      if (filterCategory === categoryToDelete.id) setFilterCategory('');
+    } catch (err) {
+      setCategoryToDelete(null);
+      notify.error(err, isAr ? 'تعذّر الحذف' : 'Suppression impossible');
+    } finally {
+      setCategoryBusy(false);
+    }
+  };
+
+  const openCategoryManager = async () => {
+    setShowCategoryManager(true);
+    setNewCategoryName('');
+    refreshCategoryUsage(categories);
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -180,6 +255,15 @@ export const DepensesPage: React.FC = () => {
             </p>
             <p className="text-lg font-black text-rose-400">{formatDZD(totalMonth)}</p>
           </div>
+
+          <button
+            onClick={openCategoryManager}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-all"
+            title={isAr ? 'إدارة فئات المصاريف' : 'Créer ou supprimer des catégories de dépenses'}
+          >
+            <Settings2 className="w-4 h-4 text-rose-400" />
+            {isAr ? 'الفئات' : 'Catégories'}
+          </button>
 
           <button
             onClick={() => { setShowAddModal(true); setError(''); }}
@@ -410,6 +494,115 @@ export const DepensesPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Gestion des catégories de dépenses */}
+      <Modal
+        open={showCategoryManager}
+        title={isAr ? 'فئات المصاريف' : 'Catégories de dépenses'}
+        subtitle={
+          isAr
+            ? 'أضف أو احذف فئة'
+            : "Ajoutez une catégorie, ou supprimez celles qui ne servent plus."
+        }
+        icon={Tag}
+        width="max-w-lg"
+        onClose={() => setShowCategoryManager(false)}
+        footer={
+          <button className="gv-btn-ghost" onClick={() => setShowCategoryManager(false)}>
+            {isAr ? 'إغلاق' : 'Fermer'}
+          </button>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="gv-label">{isAr ? 'فئة جديدة' : 'Nouvelle catégorie'}</label>
+            <div className="flex items-center gap-2">
+              <input
+                className="gv-input flex-1"
+                value={newCategoryName}
+                onChange={e => setNewCategoryName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleAddCategory(); }}
+                placeholder={isAr ? 'مثال : إنترنت' : 'Ex. Internet, Assurance, Carburant…'}
+                maxLength={60}
+              />
+              <button
+                className="gv-btn-primary"
+                disabled={categoryBusy || !newCategoryName.trim()}
+                onClick={handleAddCategory}
+              >
+                {categoryBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                {isAr ? 'إضافة' : 'Ajouter'}
+              </button>
+            </div>
+          </div>
+
+          <div className="gv-card-flat !p-0 overflow-hidden">
+            <table className="gv-table">
+              <thead>
+                <tr>
+                  <th>{isAr ? 'الفئة' : 'Catégorie'}</th>
+                  <th className="w-28 text-center">{isAr ? 'الاستعمال' : 'Utilisations'}</th>
+                  <th className="w-16"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {categories.map(cat => {
+                  const used = categoryUsage[cat.id] ?? 0;
+                  const locked = used > 0 || categories.length <= 1;
+                  return (
+                    <tr key={cat.id}>
+                      <td className="font-semibold">{cat.name}</td>
+                      <td className="text-center">
+                        {used > 0
+                          ? <span className="gv-badge-accent">{used}</span>
+                          : <span className="gv-badge-neutral">0</span>}
+                      </td>
+                      <td className="text-end">
+                        <button
+                          onClick={() => setCategoryToDelete(cat)}
+                          disabled={locked}
+                          className="p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-rose-500/10 text-rose-500"
+                          title={
+                            used > 0
+                              ? `${used} dépense(s) utilisent cette catégorie : reclassez-les d'abord.`
+                              : categories.length <= 1
+                                ? 'Il doit rester au moins une catégorie.'
+                                : 'Supprimer cette catégorie'
+                          }
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="text-[11px] gv-muted leading-relaxed">
+            {isAr
+              ? 'لا يمكن حذف فئة مستعملة : ستفقد المصاريف القديمة تسميتها.'
+              : "Une catégorie déjà utilisée ne peut pas être supprimée : les dépenses passées "
+                + "perdraient leur libellé et les rapports deviendraient faux. Chaque ajout et "
+                + "chaque suppression est inscrit au journal d'audit."}
+          </p>
+        </div>
+      </Modal>
+
+      <ConfirmDialog
+        open={Boolean(categoryToDelete)}
+        danger
+        title={isAr ? 'حذف الفئة' : 'Supprimer la catégorie'}
+        message={
+          categoryToDelete
+            ? `La catégorie « ${categoryToDelete.name} » sera définitivement supprimée. Cette action est inscrite au journal d'audit.`
+            : ''
+        }
+        confirmLabel={isAr ? 'حذف' : 'Supprimer'}
+        onCancel={() => setCategoryToDelete(null)}
+        onConfirm={handleDeleteCategory}
+      />
+
     </div>
   );
 };
