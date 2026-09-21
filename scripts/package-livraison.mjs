@@ -32,7 +32,12 @@ const items = [
   { from: path.join(RELEASE, `Gestion-POS-Portable-${VERSION}.exe`), to: `Installation/Gestion-POS-Portable-${VERSION}.exe`, required: true },
   { from: path.join(DOCS, 'Guide-Installation-et-Demarrage.pdf'), to: 'Documentation/Guide-Installation-et-Demarrage.pdf', required: true },
   { from: path.join(DOCS, 'Guide-Tests-et-Depannage.pdf'), to: 'Documentation/Guide-Tests-et-Depannage.pdf', required: true },
-  { from: path.join(DOCS, 'LISEZ-MOI.txt'), to: 'LISEZ-MOI.txt', required: true }
+  { from: path.join(DOCS, 'LISEZ-MOI.txt'), to: 'LISEZ-MOI.txt', required: true },
+  {
+    from: path.join(ROOT, 'presentation/Gestion-POS-Presentation.pptx'),
+    to: 'Presentation/Gestion-POS-Presentation.pptx',
+    required: false
+  }
 ];
 
 const humanSize = bytes => {
