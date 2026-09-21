@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { User, Permission, SystemModule } from '@gestion-veloo/shared';
+import { can, User, SystemModule } from '@gestion-veloo/shared';
 
 interface AuthState {
   user: User | null;
@@ -50,13 +50,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
       localStorage.setItem('gv_theme', next);
       set({ theme: next });
     },
-    hasPermission: (module, action) => {
-      const { user } = get();
-      if (!user) return false;
-      if (user.role === 'owner') return true;
-      const perm = user.permissions?.find(p => p.module === module);
-      if (!perm) return false;
-      return action === 'view' ? perm.canView : perm.canEdit;
-    }
+    // Même fonction partagée que le process principal Electron et l'API :
+    // un droit refusé côté serveur ne peut pas apparaître autorisé ici.
+    hasPermission: (module, action) => can(get().user, module, action)
   };
 });

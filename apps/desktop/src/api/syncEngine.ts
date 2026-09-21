@@ -2,6 +2,7 @@ import { invokeIpc } from './electronBridge';
 
 const DEFAULT_SERVER = 'https://gestion-veloo-server.onrender.com';
 const STORAGE_KEY = 'gv_desktop_server_url';
+const KEY_STORAGE = 'gv_desktop_sync_key';
 
 export function getServerUrl(): string {
   const custom = localStorage.getItem(STORAGE_KEY);
@@ -18,6 +19,16 @@ export function setServerUrl(url: string): void {
   else localStorage.removeItem(STORAGE_KEY);
 }
 
+/** Clé partagée avec le serveur central (SYNC_API_KEY) pour authentifier ce poste. */
+export function getSyncKey(): string {
+  return localStorage.getItem(KEY_STORAGE) || '';
+}
+
+export function setSyncKey(key: string): void {
+  if (key?.trim()) localStorage.setItem(KEY_STORAGE, key.trim());
+  else localStorage.removeItem(KEY_STORAGE);
+}
+
 export interface SyncResult {
   success: boolean;
   message: string;
@@ -28,13 +39,19 @@ export interface SyncResult {
 
 const PUSH_TIMEOUT_MS = 20000;
 
-async function postJson(url: string, body: unknown): Promise<Response> {
+async function postJson(url: string, body: any): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PUSH_TIMEOUT_MS);
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+  const key = getSyncKey();
+  if (key) headers['X-Sync-Key'] = key;
+  if (body?.deviceId) headers['X-Device-Id'] = String(body.deviceId);
+
   try {
     return await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
       signal: controller.signal
     });
@@ -63,8 +80,15 @@ export async function runFullSync(storeId = 1): Promise<SyncResult> {
     const response = await postJson(`${serverUrl}/api/sync/push`, payload);
     if (!response.ok) {
       const detail = await response.json().catch(() => ({} as any));
+      if (response.status === 401) {
+        throw new Error(
+          detail?.error ||
+          "Ce poste n'est pas autorisé par le serveur central. Renseignez la clé de synchronisation dans Paramètres."
+        );
+      }
       throw new Error(detail?.error || `Le serveur a répondu ${response.status}.`);
     }
+    const ack = await response.json().catch(() => ({} as any));
 
     const auditCount = payload.auditEntries?.length || 0;
     const pushedCount =
@@ -86,7 +110,9 @@ export async function runFullSync(storeId = 1): Promise<SyncResult> {
       pushedCount,
       auditCount,
       timestamp,
-      message: `${pushedCount} enregistrement(s) transmis au portail, dont ${auditCount} entrée(s) de journal.`
+      message:
+        `${pushedCount} enregistrement(s) transmis au portail, dont ${auditCount} entrée(s) de journal.` +
+        (ack?.authenticated === false ? " Attention : le serveur accepte ce poste sans clé de synchronisation." : '')
     };
   } catch (err: any) {
     const message = err?.name === 'AbortError'

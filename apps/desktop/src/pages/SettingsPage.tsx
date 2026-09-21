@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { notify } from '../lib/notify';
 import { invokeIpc } from '../api/electronBridge';
+import { getServerUrl, setServerUrl, getSyncKey, setSyncKey, runFullSync } from '../api/syncEngine';
 import { 
   Settings, 
   Printer, 
@@ -22,7 +23,10 @@ import {
   Trash2,
   Plus,
   Sliders,
-  Layers
+  Layers,
+  Cloud,
+  KeyRound,
+  ShieldAlert
 } from 'lucide-react';
 
 interface SystemPrinter {
@@ -74,6 +78,9 @@ export const SettingsPage: React.FC = () => {
   const [rc, setRc] = useState('');
   const [articleImposition, setArticleImposition] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [serverUrl, setServerUrlState] = useState(getServerUrl());
+  const [syncKey, setSyncKeyState] = useState(getSyncKey());
+  const [syncTesting, setSyncTesting] = useState(false);
   const [costThreshold, setCostThreshold] = useState(5);
   const [lowStockAlert, setLowStockAlert] = useState(5);
   const [allowNegativeStock, setAllowNegativeStock] = useState(false);
@@ -205,6 +212,28 @@ export const SettingsPage: React.FC = () => {
       }
     } catch (err) {
       notify.error(err, 'Impression de test impossible');
+    }
+  };
+
+  const handleSaveSync = () => {
+    setServerUrl(serverUrl);
+    setSyncKey(syncKey);
+    notify.success(
+      isAr ? 'تم حفظ إعدادات المزامنة' : 'Liaison au portail enregistrée',
+      isAr ? undefined : serverUrl || 'Serveur par défaut'
+    );
+  };
+
+  const handleTestSync = async () => {
+    setServerUrl(serverUrl);
+    setSyncKey(syncKey);
+    setSyncTesting(true);
+    try {
+      const res = await runFullSync(currentStore?.id || 1);
+      if (res.success) notify.success(isAr ? 'نجحت المزامنة' : 'Synchronisation réussie', res.message);
+      else notify.warn(isAr ? 'فشلت المزامنة' : 'Synchronisation en échec', res.message);
+    } finally {
+      setSyncTesting(false);
     }
   };
 
@@ -604,6 +633,82 @@ export const SettingsPage: React.FC = () => {
                   }`}
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Section: Portail central & synchronisation */}
+          <div className={`space-y-4 p-4 rounded-2xl border ${
+            isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+          }`}>
+            <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+              <Cloud className="w-3.5 h-3.5 text-blue-500" />
+              {isAr ? 'المزامنة مع البوابة المركزية' : 'Portail central & synchronisation'}
+            </h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={`text-[11px] font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  {isAr ? 'عنوان الخادم' : 'Adresse du serveur'}
+                </label>
+                <input
+                  type="text"
+                  value={serverUrl}
+                  onChange={e => setServerUrlState(e.target.value)}
+                  placeholder="https://mon-serveur.onrender.com"
+                  className={`w-full mt-1.5 border rounded-xl px-3.5 py-2.5 text-xs font-mono outline-none ${
+                    isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`text-[11px] font-semibold flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <KeyRound className="w-3 h-3" />
+                  {isAr ? 'مفتاح المزامنة' : 'Clé de synchronisation'}
+                </label>
+                <input
+                  type="password"
+                  value={syncKey}
+                  onChange={e => setSyncKeyState(e.target.value)}
+                  placeholder={isAr ? 'نفس قيمة SYNC_API_KEY' : 'Identique à SYNC_API_KEY du serveur'}
+                  className={`w-full mt-1.5 border rounded-xl px-3.5 py-2.5 text-xs font-mono outline-none ${
+                    isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                  }`}
+                />
+              </div>
+            </div>
+
+            {!syncKey && (
+              <div className={`p-3 rounded-xl text-[11px] leading-relaxed flex items-start gap-2 ${
+                isDark ? 'bg-amber-950/40 border border-amber-900/50 text-amber-200' : 'bg-amber-50 border border-amber-200 text-amber-800'
+              }`}>
+                <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  {isAr
+                    ? 'بدون مفتاح، يقبل الخادم بيانات هذه الصندوق دون التحقق من هويتها.'
+                    : "Sans clé, le serveur accepte les envois de cette caisse sans vérifier son identité. Définissez SYNC_API_KEY côté serveur, puis reportez la même valeur ici."}
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={handleSaveSync}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl text-xs flex items-center gap-2"
+              >
+                <Save className="w-3.5 h-3.5" />
+                {isAr ? 'حفظ إعدادات المزامنة' : 'Enregistrer la liaison'}
+              </button>
+              <button
+                type="button"
+                disabled={syncTesting}
+                onClick={handleTestSync}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center gap-2"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${syncTesting ? 'animate-spin' : ''}`} />
+                {isAr ? 'اختبار المزامنة الآن' : 'Tester la synchronisation'}
+              </button>
             </div>
           </div>
 

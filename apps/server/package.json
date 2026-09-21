@@ -6,7 +6,9 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "seed": "tsx src/db/seed.ts"
+    "seed": "tsx src/db/seed.ts",
+    "test": "node tests/sync-and-journal.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@gestion-veloo/shared": "workspace:*",

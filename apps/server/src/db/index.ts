@@ -364,4 +364,119 @@ function initSqliteTables(sqlite: any) {
 
   try { sqlite.exec(`ALTER TABLE products ADD COLUMN location TEXT NOT NULL DEFAULT ''`); } catch {}
   try { sqlite.exec(`ALTER TABLE settings ADD COLUMN avg_price_mode INTEGER NOT NULL DEFAULT 1`); } catch {}
+
+  initSupervisionTables(sqlite);
+}
+
+/**
+ * Tables de supervision : ce que le portail du propriétaire doit pouvoir lire,
+ * alimenté par les caisses lors de la synchronisation.
+ *
+ * `audit_log` est en ajout seul et porte une clé naturelle (poste + identifiant
+ * local) : un même événement renvoyé plusieurs fois n'est jamais dupliqué.
+ */
+function initSupervisionTables(sqlite: any) {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      device_id TEXT NOT NULL DEFAULT '',
+      local_id INTEGER NOT NULL,
+      user_id INTEGER,
+      user_name TEXT,
+      store_id INTEGER,
+      action TEXT NOT NULL,
+      module TEXT NOT NULL,
+      entity_type TEXT,
+      entity_id INTEGER,
+      severity TEXT NOT NULL DEFAULT 'info',
+      summary TEXT NOT NULL DEFAULT '',
+      changes_json TEXT,
+      metadata_json TEXT,
+      app_version TEXT,
+      created_at TEXT NOT NULL,
+      received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(device_id, local_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS product_cost_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      device_id TEXT NOT NULL DEFAULT '',
+      local_id INTEGER NOT NULL,
+      product_id INTEGER,
+      store_id INTEGER,
+      previous_cost INTEGER NOT NULL DEFAULT 0,
+      incoming_cost INTEGER NOT NULL DEFAULT 0,
+      new_cost INTEGER NOT NULL DEFAULT 0,
+      stock_before INTEGER NOT NULL DEFAULT 0,
+      strategy TEXT NOT NULL DEFAULT '',
+      reason TEXT NOT NULL DEFAULT '',
+      ref_type TEXT,
+      ref_id INTEGER,
+      user_id INTEGER,
+      created_at TEXT NOT NULL,
+      UNIQUE(device_id, local_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS sync_devices (
+      device_id TEXT PRIMARY KEY,
+      store_id INTEGER,
+      app_version TEXT,
+      last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_batch_at TEXT,
+      total_batches INTEGER NOT NULL DEFAULT 0,
+      last_ip TEXT,
+      first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS sync_batches (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      device_id TEXT,
+      store_id INTEGER,
+      authenticated INTEGER NOT NULL DEFAULT 0,
+      counts_json TEXT,
+      received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_audit_store ON audit_log(store_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_audit_module ON audit_log(module, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_audit_severity ON audit_log(severity, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_cost_history_product ON product_cost_history(product_id, created_at DESC);
+  `);
+
+  // `product_stock` a été créée sans contrainte d'unicité : l'upsert de la
+  // synchronisation (ON CONFLICT(product_id, store_id)) échouait donc à chaque
+  // lot contenant des mouvements de stock, faisant échouer tout l'envoi.
+  // On déduplique puis on pose l'index manquant.
+  try {
+    sqlite.exec(`
+      DELETE FROM product_stock
+      WHERE id NOT IN (SELECT MAX(id) FROM product_stock GROUP BY product_id, store_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_product_stock_unique ON product_stock(product_id, store_id);
+    `);
+  } catch (err) {
+    console.warn('[migration] index unique product_stock:', (err as Error).message);
+  }
+
+  // Colonnes ajoutées après coup sur des déploiements existants.
+  const add = (table: string, column: string, definition: string) => {
+    try {
+      const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all().map((r: any) => r.name);
+      if (!cols.includes(column)) sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    } catch {}
+  };
+  add('sale_items', 'unit_cost_snapshot', 'INTEGER NOT NULL DEFAULT 0');
+  add('return_items', 'unit_cost_snapshot', 'INTEGER NOT NULL DEFAULT 0');
+  add('returns', 'reason', `TEXT NOT NULL DEFAULT ''`);
+  add('purchases', 'reference', `TEXT NOT NULL DEFAULT ''`);
+  add('purchase_items', 'cost_strategy', `TEXT NOT NULL DEFAULT ''`);
+  add('purchase_items', 'cost_before', 'INTEGER NOT NULL DEFAULT 0');
+  add('purchase_items', 'cost_after', 'INTEGER NOT NULL DEFAULT 0');
+  add('stock_movements', 'unit_cost', 'INTEGER NOT NULL DEFAULT 0');
+  add('stock_movements', 'note', 'TEXT');
+  add('products', 'min_stock', 'INTEGER NOT NULL DEFAULT 0');
+  add('settings', 'cost_threshold', 'INTEGER NOT NULL DEFAULT 5');
+  add('settings', 'low_stock_alert', 'INTEGER NOT NULL DEFAULT 5');
+  add('settings', 'allow_negative_stock', 'INTEGER NOT NULL DEFAULT 0');
 }

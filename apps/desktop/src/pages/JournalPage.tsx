@@ -224,8 +224,8 @@ export const JournalPage: React.FC = () => {
             <span className="text-[11px] font-black uppercase tracking-wide">Filtres</span>
             <button className="text-[10px] gv-muted hover:underline ms-auto" onClick={resetFilters}>Réinitialiser</button>
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-7 gap-2.5">
-            <div className="col-span-2 relative">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+            <div className="col-span-2 lg:col-span-1 relative">
               <Search className="w-4 h-4 gv-muted absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 className="gv-input ps-9 !py-2"
@@ -254,7 +254,7 @@ export const JournalPage: React.FC = () => {
               <option value="">Tous les utilisateurs</option>
               {filterOptions.users.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="col-span-2 grid grid-cols-2 gap-2">
               <input type="date" className="gv-input !py-2" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(0); }} />
               <input type="date" className="gv-input !py-2" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(0); }} />
             </div>

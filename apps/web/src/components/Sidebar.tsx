@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, History, Users, Boxes, Bike, Network, ArrowLeftRight } from 'lucide-react';
+import { LayoutDashboard, History, Users, Boxes, Bike, Network, ScrollText } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 
 interface SidebarProps {
@@ -12,11 +12,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab }) =
   const isDark = theme === 'dark';
 
   const menuItems = [
+    { id: 'journal', label: "Journal d'Audit & Traçabilité", icon: ScrollText },
     { id: 'reports', label: 'Tableau de Bord & Rapports', icon: LayoutDashboard },
     { id: 'sync', label: 'Réseau & Sync Desktop (.exe)', icon: Network },
     { id: 'stock', label: 'Vue Stock & Transferts', icon: Boxes },
     { id: 'audit', label: 'Journal d\'Audit (Code 90)', icon: History },
-    { id: 'users', label: 'Droits & Utilisateurs (10 Modules)', icon: Users }
+    { id: 'users', label: 'Droits & Utilisateurs', icon: Users }
   ];
 
   return (

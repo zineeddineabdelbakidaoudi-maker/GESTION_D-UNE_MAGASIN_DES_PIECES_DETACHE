@@ -1,12 +1,13 @@
 import { Router, Response } from 'express';
 import { getDb } from '../db';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { authenticateSyncDevice, SyncRequest } from '../middleware/syncAuth';
 import { SyncBatchPayload } from '@gestion-veloo/shared';
 
 const router = Router();
 
 // POST /api/sync/push (Store pushes offline transactions to central server)
-router.post('/push', (req, res) => {
+router.post('/push', authenticateSyncDevice, (req: SyncRequest, res) => {
   const payload: SyncBatchPayload = req.body;
   const { rawDb, isPg } = getDb();
 
@@ -15,7 +16,12 @@ router.post('/push', (req, res) => {
   }
 
   try {
-    const { storeId = 1, sales, returns, purchases, stockMovements, clientTransactions, supplierTransactions, stockTransfers, depenses } = payload || {};
+    const {
+      storeId = 1, sales, returns, purchases, stockMovements,
+      clientTransactions, supplierTransactions, stockTransfers, depenses
+    } = payload || {};
+    const extra = (payload || {}) as any;
+    const deviceId = String(req.sync?.deviceId || extra.deviceId || 'inconnu');
 
     const validStoreId = Number(storeId) || 1;
 
@@ -302,12 +308,128 @@ router.post('/push', (req, res) => {
       }
     }
 
+    // 10. Journal d'audit — ajout seul, dédupliqué sur (poste, identifiant local).
+    let auditInserted = 0;
+    if (Array.isArray(extra.auditEntries) && extra.auditEntries.length > 0) {
+      const insertAudit = rawDb.prepare(`
+        INSERT OR IGNORE INTO audit_log
+          (device_id, local_id, user_id, user_name, store_id, action, module, entity_type, entity_id,
+           severity, summary, changes_json, metadata_json, app_version, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const raw of extra.auditEntries) {
+        try {
+          const a = raw as any;
+          const result = insertAudit.run(
+            String(a.device_id || a.deviceId || deviceId),
+            Number(a.id),
+            a.user_id ?? a.userId ?? null,
+            a.user_name || a.userName || null,
+            a.store_id ?? a.storeId ?? validStoreId,
+            String(a.action || 'inconnu'),
+            String(a.module || 'inconnu'),
+            a.entity_type || a.entityType || null,
+            a.entity_id ?? a.entityId ?? null,
+            String(a.severity || 'info'),
+            String(a.summary || ''),
+            a.changes_json ?? (a.changes ? JSON.stringify(a.changes) : null),
+            a.metadata_json ?? (a.metadata ? JSON.stringify(a.metadata) : null),
+            a.app_version || a.appVersion || null,
+            String(a.created_at || a.createdAt || new Date().toISOString())
+          );
+          if (result.changes > 0) auditInserted++;
+        } catch (auditErr) {
+          console.error('Entrée de journal rejetée:', (auditErr as Error).message);
+        }
+      }
+    }
+
+    // 11. Historique des prix d'achat (traçabilité de la règle de valorisation).
+    let costInserted = 0;
+    if (Array.isArray(extra.costHistory) && extra.costHistory.length > 0) {
+      const insertCost = rawDb.prepare(`
+        INSERT OR IGNORE INTO product_cost_history
+          (device_id, local_id, product_id, store_id, previous_cost, incoming_cost, new_cost,
+           stock_before, strategy, reason, ref_type, ref_id, user_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const raw of extra.costHistory) {
+        try {
+          const c = raw as any;
+          const result = insertCost.run(
+            deviceId,
+            Number(c.id),
+            c.product_id ?? c.productId ?? null,
+            c.store_id ?? c.storeId ?? validStoreId,
+            Number(c.previous_cost ?? c.previousCost ?? 0),
+            Number(c.incoming_cost ?? c.incomingCost ?? 0),
+            Number(c.new_cost ?? c.newCost ?? 0),
+            Number(c.stock_before ?? c.stockBefore ?? 0),
+            String(c.strategy || ''),
+            String(c.reason || ''),
+            c.ref_type || c.refType || null,
+            c.ref_id ?? c.refId ?? null,
+            c.user_id ?? c.userId ?? null,
+            String(c.created_at || c.createdAt || new Date().toISOString())
+          );
+          if (result.changes > 0) costInserted++;
+        } catch {}
+      }
+    }
+
+    // 12. Photographie du stock : la valeur envoyée par la caisse fait foi.
+    if (Array.isArray(extra.stock) && extra.stock.length > 0) {
+      const upsertStock = rawDb.prepare(`
+        INSERT INTO product_stock (product_id, store_id, quantity) VALUES (?, ?, ?)
+        ON CONFLICT(product_id, store_id) DO UPDATE SET quantity = excluded.quantity
+      `);
+      for (const raw of extra.stock) {
+        try {
+          const st = raw as any;
+          upsertStock.run(getSafeProductId(st.product_id ?? st.productId), validStoreId, Number(st.quantity ?? 0));
+        } catch {}
+      }
+    }
+
     // Re-enable foreign keys
     rawDb.pragma('foreign_keys = ON');
 
+    // 13. Traçabilité de la synchronisation elle-même.
+    const counts = {
+      sales: sales?.length || 0,
+      returns: returns?.length || 0,
+      purchases: purchases?.length || 0,
+      stockMovements: stockMovements?.length || 0,
+      depenses: depenses?.length || 0,
+      auditReceived: extra.auditEntries?.length || 0,
+      auditInserted,
+      costInserted
+    };
+
+    try {
+      rawDb.prepare(`
+        INSERT INTO sync_devices (device_id, store_id, app_version, last_seen_at, last_batch_at, total_batches, last_ip)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1, ?)
+        ON CONFLICT(device_id) DO UPDATE SET
+          store_id = excluded.store_id,
+          app_version = COALESCE(excluded.app_version, sync_devices.app_version),
+          last_seen_at = CURRENT_TIMESTAMP,
+          last_batch_at = CURRENT_TIMESTAMP,
+          total_batches = sync_devices.total_batches + 1,
+          last_ip = excluded.last_ip
+      `).run(deviceId, validStoreId, extra.appVersion || null, req.ip || null);
+
+      rawDb.prepare('INSERT INTO sync_batches (device_id, store_id, authenticated, counts_json) VALUES (?, ?, ?, ?)')
+        .run(deviceId, validStoreId, req.sync?.authenticated ? 1 : 0, JSON.stringify(counts));
+    } catch (trackErr) {
+      console.error('Suivi de synchronisation:', (trackErr as Error).message);
+    }
+
     res.json({
       success: true,
-      syncedTimestamp: new Date().toISOString()
+      syncedTimestamp: new Date().toISOString(),
+      authenticated: Boolean(req.sync?.authenticated),
+      counts
     });
   } catch (err: any) {
     console.error('Server sync error:', err);

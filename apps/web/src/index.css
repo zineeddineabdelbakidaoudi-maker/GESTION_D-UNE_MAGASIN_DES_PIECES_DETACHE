@@ -2,7 +2,320 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
+/* ============================================================
+   Système de design — Portail web propriétaire
+   Mêmes jetons que l'application de caisse, pour que les deux
+   surfaces se lisent comme un seul produit.
+   ============================================================ */
+
+:root {
+  --gv-bg: 248 250 252;
+  --gv-surface: 255 255 255;
+  --gv-surface-2: 241 245 249;
+  --gv-border: 226 232 240;
+  --gv-border-strong: 203 213 225;
+  --gv-text: 15 23 42;
+  --gv-text-muted: 100 116 139;
+
+  --gv-accent: 37 99 235;
+  --gv-accent-soft: 219 234 254;
+  --gv-success: 22 163 74;
+  --gv-success-soft: 220 252 231;
+  --gv-warning: 217 119 6;
+  --gv-warning-soft: 254 243 199;
+  --gv-danger: 220 38 38;
+  --gv-danger-soft: 254 226 226;
+
+  --gv-radius: 0.875rem;
+  --gv-shadow: 0 1px 2px rgb(15 23 42 / 0.06), 0 8px 24px -12px rgb(15 23 42 / 0.18);
+  --gv-shadow-lg: 0 24px 48px -20px rgb(15 23 42 / 0.35);
+}
+
+.dark {
+  --gv-bg: 2 6 23;
+  --gv-surface: 15 23 42;
+  --gv-surface-2: 30 41 59;
+  --gv-border: 30 41 59;
+  --gv-border-strong: 51 65 85;
+  --gv-text: 241 245 249;
+  --gv-text-muted: 148 163 184;
+
+  --gv-accent: 59 130 246;
+  --gv-accent-soft: 30 58 138;
+  --gv-success: 34 197 94;
+  --gv-success-soft: 5 46 22;
+  --gv-warning: 245 158 11;
+  --gv-warning-soft: 69 26 3;
+  --gv-danger: 248 113 113;
+  --gv-danger-soft: 69 10 10;
+
+  --gv-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  --gv-shadow-lg: 0 24px 48px -20px rgb(0 0 0 / 0.75);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    font-family: 'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'tnum';
+    background-color: rgb(var(--gv-bg));
+    color: rgb(var(--gv-text));
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Les montants et quantités s'alignent toujours en chiffres tabulaires. */
+  .font-mono,
+  td[data-numeric],
+  .gv-amount {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--gv-accent));
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--gv-border-strong));
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--gv-text-muted));
+    background-clip: content-box;
+  }
+
+  /* Les flèches natives des champs numériques gênent la saisie au clavier de caisse. */
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer components {
+  .gv-surface {
+    background-color: rgb(var(--gv-surface));
+    border: 1px solid rgb(var(--gv-border));
+  }
+
+  .gv-card {
+    @apply rounded-2xl p-4 transition-colors;
+    background-color: rgb(var(--gv-surface));
+    border: 1px solid rgb(var(--gv-border));
+    box-shadow: var(--gv-shadow);
+  }
+
+  .gv-card-flat {
+    @apply rounded-2xl p-4;
+    background-color: rgb(var(--gv-surface-2));
+    border: 1px solid rgb(var(--gv-border));
+  }
+
+  .gv-muted {
+    color: rgb(var(--gv-text-muted));
+  }
+
+  .gv-label {
+    @apply block text-[11px] font-bold uppercase tracking-wide mb-1.5;
+    color: rgb(var(--gv-text-muted));
+  }
+
+  .gv-input {
+    @apply w-full rounded-xl px-3.5 py-2.5 text-sm font-medium outline-none transition-all;
+    background-color: rgb(var(--gv-surface-2));
+    border: 1px solid rgb(var(--gv-border-strong));
+    color: rgb(var(--gv-text));
+  }
+  .gv-input::placeholder {
+    color: rgb(var(--gv-text-muted));
+  }
+  .gv-input:focus {
+    border-color: rgb(var(--gv-accent));
+    box-shadow: 0 0 0 3px rgb(var(--gv-accent) / 0.18);
+  }
+  .gv-input:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .gv-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all
+           disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] whitespace-nowrap;
+  }
+  .gv-btn-primary {
+    @apply gv-btn text-white;
+    background-color: rgb(var(--gv-accent));
+    box-shadow: 0 8px 20px -10px rgb(var(--gv-accent) / 0.9);
+  }
+  .gv-btn-primary:hover:not(:disabled) {
+    filter: brightness(1.1);
+  }
+  .gv-btn-ghost {
+    @apply gv-btn;
+    background-color: rgb(var(--gv-surface-2));
+    border: 1px solid rgb(var(--gv-border-strong));
+    color: rgb(var(--gv-text));
+  }
+  .gv-btn-ghost:hover:not(:disabled) {
+    border-color: rgb(var(--gv-accent));
+    color: rgb(var(--gv-accent));
+  }
+  .gv-btn-danger {
+    @apply gv-btn text-white;
+    background-color: rgb(var(--gv-danger));
+  }
+  .gv-btn-danger:hover:not(:disabled) {
+    filter: brightness(1.1);
+  }
+  .gv-btn-success {
+    @apply gv-btn text-white;
+    background-color: rgb(var(--gv-success));
+  }
+  .gv-btn-success:hover:not(:disabled) {
+    filter: brightness(1.1);
+  }
+
+  .gv-badge {
+    @apply inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide;
+  }
+  .gv-badge-neutral {
+    @apply gv-badge;
+    background-color: rgb(var(--gv-surface-2));
+    color: rgb(var(--gv-text-muted));
+    border: 1px solid rgb(var(--gv-border));
+  }
+  .gv-badge-accent {
+    @apply gv-badge;
+    background-color: rgb(var(--gv-accent) / 0.14);
+    color: rgb(var(--gv-accent));
+  }
+  .gv-badge-success {
+    @apply gv-badge;
+    background-color: rgb(var(--gv-success) / 0.14);
+    color: rgb(var(--gv-success));
+  }
+  .gv-badge-warning {
+    @apply gv-badge;
+    background-color: rgb(var(--gv-warning) / 0.16);
+    color: rgb(var(--gv-warning));
+  }
+  .gv-badge-danger {
+    @apply gv-badge;
+    background-color: rgb(var(--gv-danger) / 0.14);
+    color: rgb(var(--gv-danger));
+  }
+
+  .gv-table {
+    @apply w-full text-xs border-collapse;
+  }
+  .gv-table thead th {
+    @apply px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-wider sticky top-0 z-10;
+    background-color: rgb(var(--gv-surface-2));
+    color: rgb(var(--gv-text-muted));
+    border-bottom: 1px solid rgb(var(--gv-border-strong));
+  }
+  .gv-table tbody td {
+    @apply px-3 py-2.5 align-middle;
+    border-bottom: 1px solid rgb(var(--gv-border));
+  }
+  .gv-table tbody tr {
+    transition: background-color 120ms ease;
+  }
+  .gv-table tbody tr:hover {
+    background-color: rgb(var(--gv-surface-2));
+  }
+
+  .gv-scroll {
+    @apply overflow-y-auto;
+    scrollbar-gutter: stable;
+  }
+
+  .gv-modal-backdrop {
+    @apply fixed inset-0 z-50 flex items-center justify-center p-6;
+    background-color: rgb(2 6 23 / 0.72);
+    backdrop-filter: blur(4px);
+    animation: gv-fade 140ms ease-out;
+  }
+
+  .gv-modal {
+    @apply w-full rounded-2xl overflow-hidden flex flex-col max-h-[90vh];
+    background-color: rgb(var(--gv-surface));
+    border: 1px solid rgb(var(--gv-border-strong));
+    box-shadow: var(--gv-shadow-lg);
+    animation: gv-rise 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .gv-kpi-value {
+    @apply text-2xl font-black tracking-tight;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Séparateur de section discret, utilisé dans les panneaux latéraux. */
+  .gv-divider {
+    height: 1px;
+    background-color: rgb(var(--gv-border));
+  }
+}
+
+@keyframes gv-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes gv-rise {
+  from { opacity: 0; transform: translateY(12px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes gv-slide-in {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.gv-animate-in {
+  animation: gv-slide-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes gv-pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgb(var(--gv-danger) / 0.5); }
+  70% { box-shadow: 0 0 0 8px rgb(var(--gv-danger) / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(var(--gv-danger) / 0); }
+}
+
+.gv-alert-pulse {
+  animation: gv-pulse-ring 2s infinite;
+}
+
+/* L'impression ne doit sortir que le ticket, jamais l'interface. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .gv-printable,
+  .gv-printable * {
+    visibility: visible;
+  }
+  .gv-printable {
+    position: absolute;
+    inset: 0;
+  }
 }

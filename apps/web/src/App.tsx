@@ -3,16 +3,18 @@ import { useAuthStore } from './store/useAuthStore';
 import { LoginPage } from './pages/LoginPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { AuditPage } from './pages/AuditPage';
+import { JournalPage } from './pages/JournalPage';
 import { UsersPage } from './pages/UsersPage';
 import { StockOverviewPage } from './pages/StockOverviewPage';
 import { SyncNetworkPage } from './pages/SyncNetworkPage';
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
 import { TrialBanner } from './components/TrialBanner';
+import { Toaster } from './components/ui';
 
 export const App: React.FC = () => {
   const { user, theme } = useAuthStore();
-  const [currentTab, setCurrentTab] = useState('reports');
+  const [currentTab, setCurrentTab] = useState('journal');
   const isDark = theme === 'dark';
 
   useEffect(() => {
@@ -40,11 +42,13 @@ export const App: React.FC = () => {
             {currentTab === 'reports' && <ReportsPage />}
             {currentTab === 'sync' && <SyncNetworkPage />}
             {currentTab === 'stock' && <StockOverviewPage />}
+            {currentTab === 'journal' && <JournalPage />}
             {currentTab === 'audit' && <AuditPage />}
             {currentTab === 'users' && <UsersPage />}
           </main>
         </div>
       </div>
+      <Toaster />
     </div>
   );
 };

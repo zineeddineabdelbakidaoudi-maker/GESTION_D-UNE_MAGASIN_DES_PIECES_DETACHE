@@ -46,19 +46,21 @@ export function requirePermission(moduleName: SystemModule, action: 'view' | 'ed
 
     let canAccess = false;
     if (isPg) {
-      // Postgres check (async handler will wrap)
-      next();
-      return;
-    } else {
-      const permRow = rawDb.prepare(`
-        SELECT can_view, can_edit 
-        FROM permissions 
-        WHERE user_id = ? AND module = ?
-      `).get(userId, moduleName) as any;
+      // Les permissions fines ne sont pas encore portées sur Postgres : on refuse
+      // par défaut plutôt que de laisser passer tout compte authentifié.
+      return res.status(403).json({
+        error: `Accès refusé : les permissions par module ne sont pas disponibles sur ce déploiement pour le profil « ${req.user.role} ».`
+      });
+    }
 
-      if (permRow) {
-        canAccess = action === 'view' ? Boolean(permRow.can_view) : Boolean(permRow.can_edit);
-      }
+    const permRow = rawDb.prepare(`
+      SELECT can_view, can_edit
+      FROM permissions
+      WHERE user_id = ? AND module = ?
+    `).get(userId, moduleName) as any;
+
+    if (permRow) {
+      canAccess = action === 'view' ? Boolean(permRow.can_view) : Boolean(permRow.can_edit);
     }
 
     if (!canAccess) {
