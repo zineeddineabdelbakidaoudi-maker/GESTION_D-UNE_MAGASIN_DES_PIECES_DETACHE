@@ -19,14 +19,33 @@ const ROOT = path.resolve(DESKTOP, '../..');
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'gv-tests-'));
 const BUILD = path.join(TMP, 'build');
 
+/**
+ * `better-sqlite3` est compilé pour l'ABI d'Electron. On cherche donc un runtime
+ * Electron : celui des dépendances de développement si présent, sinon
+ * l'application déjà empaquetée — son exécutable porte le nom du produit, qui
+ * peut changer, on le découvre donc plutôt que de le coder en dur.
+ */
 function findElectron() {
-  const candidates = [
+  const direct = [
     path.join(ROOT, 'node_modules/electron/dist/electron.exe'),
     path.join(DESKTOP, 'node_modules/electron/dist/electron.exe'),
     path.join(ROOT, 'node_modules/electron/dist/electron'),
-    path.join(DESKTOP, 'release/win-unpacked/Gestion Pièces Cycles & Motos POS.exe')
-  ];
-  return candidates.find(p => fs.existsSync(p));
+    path.join(DESKTOP, 'node_modules/electron/dist/electron')
+  ].find(p => fs.existsSync(p));
+  if (direct) return direct;
+
+  const unpacked = path.join(DESKTOP, 'release/win-unpacked');
+  if (!fs.existsSync(unpacked)) return null;
+
+  // `elevate.exe` et les utilitaires annexes ne sont pas le runtime : on retient
+  // l'exécutable le plus volumineux à la racine du dossier.
+  const executables = fs.readdirSync(unpacked)
+    .filter(name => name.toLowerCase().endsWith('.exe'))
+    .map(name => path.join(unpacked, name))
+    .map(file => ({ file, size: fs.statSync(file).size }))
+    .sort((a, b) => b.size - a.size);
+
+  return executables.length ? executables[0].file : null;
 }
 
 const electron = findElectron();
