@@ -195,7 +195,7 @@
   }
 
   .gv-badge {
-    @apply inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide;
+    @apply inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap;
   }
   .gv-badge-neutral {
     @apply gv-badge;
