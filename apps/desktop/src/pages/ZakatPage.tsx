@@ -50,7 +50,7 @@ export const ZakatPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+          <h1 className="text-xl font-black text-slate-100 tracking-tight flex items-center gap-2">
             <Calculator className="w-5 h-5 text-emerald-400" />
             <span>{isAr ? 'حساب الزكاة على عروض التجارة' : 'Calculateur de Zakat Commerciale'}</span>
           </h1>
@@ -72,7 +72,7 @@ export const ZakatPage: React.FC = () => {
         {/* Left 2 Cols: Form Parameters */}
         <div className="lg:col-span-2 space-y-4">
           <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-emerald-400" />
               <span>{isAr ? 'عناصر وعاء الزكاة (الصافي الخاضع)' : 'Composantes de l\'Assiette Zakatable'}</span>
             </h3>
@@ -91,7 +91,7 @@ export const ZakatPage: React.FC = () => {
                   type="number"
                   value={cashOnHand}
                   onChange={e => setCashOnHand(e.target.value)}
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm font-black font-mono text-white outline-none"
+                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm font-black font-mono text-slate-100 outline-none"
                 />
               </div>
 
@@ -123,11 +123,11 @@ export const ZakatPage: React.FC = () => {
         {/* Right 1 Col: Calculation Output */}
         <div className="space-y-4">
           <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-white">{isAr ? 'نتيجة تقييم الزكاة' : 'Résultat de l\'Évaluation'}</h3>
+            <h3 className="text-sm font-bold text-slate-100">{isAr ? 'نتيجة تقييم الزكاة' : 'Résultat de l\'Évaluation'}</h3>
 
             <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-1 text-center">
               <span className="text-xs text-slate-400 font-semibold">{isAr ? 'الوعاء الصافي الخاضع للزكاة' : 'Assiette Nette Zakatable'}</span>
-              <div className="text-xl font-black text-white font-mono">{formatDZD(netZakatable)}</div>
+              <div className="text-xl font-black text-slate-100 font-mono">{formatDZD(netZakatable)}</div>
             </div>
 
             <div className="p-4 bg-emerald-950/40 rounded-xl border border-emerald-800/50 space-y-1 text-center">

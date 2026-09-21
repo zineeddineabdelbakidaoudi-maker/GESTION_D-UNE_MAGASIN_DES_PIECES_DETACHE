@@ -45,7 +45,7 @@ export const LoginPage: React.FC = () => {
     <div
       dir={isAr ? 'rtl' : 'ltr'}
       className={`min-h-screen w-screen flex flex-col items-center justify-center p-6 select-none relative overflow-hidden ${
-        isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
+        'bg-slate-950 text-slate-100'
       }`}
     >
       {/* Fond décoratif discret, sans image externe (l'application reste 100 % hors ligne). */}
@@ -53,9 +53,7 @@ export const LoginPage: React.FC = () => {
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-[0.35]"
         style={{
-          background: isDark
-            ? 'radial-gradient(60rem 40rem at 15% -10%, rgba(37,99,235,0.28), transparent 60%), radial-gradient(50rem 35rem at 110% 110%, rgba(16,185,129,0.18), transparent 60%)'
-            : 'radial-gradient(60rem 40rem at 15% -10%, rgba(37,99,235,0.18), transparent 60%), radial-gradient(50rem 35rem at 110% 110%, rgba(16,185,129,0.14), transparent 60%)'
+          background: 'radial-gradient(60rem 40rem at 15% -10%, rgba(37,99,235,0.28), transparent 60%), radial-gradient(50rem 35rem at 110% 110%, rgba(16,185,129,0.18), transparent 60%)'
         }}
       />
 

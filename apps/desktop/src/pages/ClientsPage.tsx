@@ -115,7 +115,7 @@ export const ClientsPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+          <h1 className="text-xl font-black text-slate-100 tracking-tight flex items-center gap-2">
             <Users className="w-5 h-5 text-blue-400" />
             <span>{isAr ? 'إدارة الزبائن والديون (Crédits)' : 'Gestion des Clients & Crédits'}</span>
           </h1>
@@ -145,7 +145,7 @@ export const ClientsPage: React.FC = () => {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder={isAr ? 'ابحث باسم الزبون أو رقم الهاتف...' : 'Rechercher par nom, téléphone...'}
-              className="w-full bg-transparent text-xs font-medium text-white outline-none placeholder-slate-500"
+              className="w-full bg-transparent text-xs font-medium text-slate-100 outline-none placeholder-slate-500"
             />
           </div>
 
@@ -174,7 +174,7 @@ export const ClientsPage: React.FC = () => {
                       title={isAr ? 'انقر مرتين لفتح الملف الكامل' : 'Double-cliquez pour ouvrir la fiche complète'}
                     >
                       <td className="px-4 py-3">
-                        <div className="font-bold text-white flex items-center gap-1.5">
+                        <div className="font-bold text-slate-100 flex items-center gap-1.5">
                           <span>{c.name}</span>
                           {c.isFidele && <span title="Client Fidèle">⭐</span>}
                         </div>
@@ -237,7 +237,7 @@ export const ClientsPage: React.FC = () => {
             <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm space-y-4">
               <div className="flex items-start justify-between border-b border-slate-800 pb-3">
                 <div>
-                  <h3 className="font-bold text-white text-base flex items-center gap-1.5">
+                  <h3 className="font-bold text-slate-100 text-base flex items-center gap-1.5">
                     <span>{selectedClient.name}</span>
                     {selectedClient.isFidele && <span>⭐</span>}
                   </h3>
@@ -329,7 +329,7 @@ export const ClientsPage: React.FC = () => {
                   {selectedClient.name.slice(0, 1).toUpperCase()}
                 </div>
                 <div>
-                  <h2 className="text-lg font-black text-white flex items-center gap-2">
+                  <h2 className="text-lg font-black text-slate-100 flex items-center gap-2">
                     <span>{selectedClient.name}</span>
                     {selectedClient.isFidele && <span className="text-amber-400 text-sm">⭐ Client Fidèle</span>}
                   </h2>
@@ -349,7 +349,7 @@ export const ClientsPage: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setShowDossierModal(false)}
-                  className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
+                  className="p-2 text-slate-400 hover:text-slate-100 rounded-xl hover:bg-slate-800 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -395,7 +395,7 @@ export const ClientsPage: React.FC = () => {
                 className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
                   dossierTab === 'all'
                     ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-slate-400 hover:text-white'
+                    : 'border-transparent text-slate-400 hover:text-slate-100'
                 }`}
               >
                 {isAr ? 'سجل العمليات الكامل (Grand Livre)' : 'Journal Complet (Grand Livre)'}
@@ -405,7 +405,7 @@ export const ClientsPage: React.FC = () => {
                 className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
                   dossierTab === 'sales'
                     ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-slate-400 hover:text-white'
+                    : 'border-transparent text-slate-400 hover:text-slate-100'
                 }`}
               >
                 {isAr ? 'تفاصيل فواتير الشراء' : 'Bons de Vente / Factures'}
@@ -415,7 +415,7 @@ export const ClientsPage: React.FC = () => {
                 className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
                   dossierTab === 'versements'
                     ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-slate-400 hover:text-white'
+                    : 'border-transparent text-slate-400 hover:text-slate-100'
                 }`}
               >
                 {isAr ? 'سجل الدفعات' : 'Versements & Règlements'}
@@ -473,7 +473,7 @@ export const ClientsPage: React.FC = () => {
                     clientSales.map((s: any) => (
                       <div key={s.id} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
                         <div className="flex items-center justify-between text-xs border-b border-slate-800 pb-2">
-                          <div className="font-bold text-white">
+                          <div className="font-bold text-slate-100">
                             Ticket #{s.id} • <span className="text-slate-400 font-mono">{new Date(s.createdAt || s.created_at).toLocaleString('fr-DZ')}</span>
                           </div>
                           <div className="flex items-center gap-3">
@@ -545,7 +545,7 @@ export const ClientsPage: React.FC = () => {
             <div className="p-4 border-t border-slate-800 bg-slate-950 flex justify-end">
               <button
                 onClick={() => setShowDossierModal(false)}
-                className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition-colors"
+                className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold rounded-xl transition-colors"
               >
                 Fermer
               </button>
@@ -559,10 +559,10 @@ export const ClientsPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="font-bold text-white text-base">
+              <h3 className="font-bold text-slate-100 text-base">
                 {isAr ? 'إضافة زبون جديد' : 'Nouveau Client'}
               </h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-100">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -576,7 +576,7 @@ export const ClientsPage: React.FC = () => {
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder={isAr ? 'اسم الزبون' : 'Ex: Ahmed Benali'}
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none"
+                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none"
                 />
               </div>
 
@@ -587,7 +587,7 @@ export const ClientsPage: React.FC = () => {
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
                   placeholder="05 / 06 / 07..."
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none"
+                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none"
                 />
               </div>
 
@@ -598,7 +598,7 @@ export const ClientsPage: React.FC = () => {
                   value={address}
                   onChange={e => setAddress(e.target.value)}
                   placeholder={isAr ? 'المدينة / الحي' : 'Ex: Bab Ezzouar, Alger'}
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none"
+                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none"
                 />
               </div>
 
@@ -619,7 +619,7 @@ export const ClientsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 text-slate-400 hover:text-white rounded-xl"
+                  className="px-4 py-2 text-slate-400 hover:text-slate-100 rounded-xl"
                 >
                   {isAr ? 'إلغاء' : 'Annuler'}
                 </button>
@@ -640,17 +640,17 @@ export const ClientsPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="font-bold text-white text-base">
+              <h3 className="font-bold text-slate-100 text-base">
                 {isAr ? 'تسجيل دفعة زبون (تسديد دين)' : 'Nouveau Versement Client'}
               </h3>
-              <button onClick={() => setShowVersementModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowVersementModal(false)} className="text-slate-400 hover:text-slate-100">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
               <span className="text-slate-400">{isAr ? 'الزبون :' : 'Client :'} </span>
-              <span className="font-bold text-white">{selectedClient.name}</span> • 
+              <span className="font-bold text-slate-100">{selectedClient.name}</span> • 
               <span className="text-slate-400"> {isAr ? 'الدين الحالي :' : 'Dette actuelle :'} </span>
               <span className="font-mono font-bold text-rose-400">{formatDZD(selectedClient.currentDebt || 0)}</span>
             </div>
@@ -677,7 +677,7 @@ export const ClientsPage: React.FC = () => {
                   placeholder={isAr ? 'مثال: تسوية جزء من الدين' : 'Ex: Règlement partiel en espèces'}
                   value={versementNote}
                   onChange={e => setVersementNote(e.target.value)}
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none"
                 />
               </div>
 
@@ -685,7 +685,7 @@ export const ClientsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowVersementModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white rounded-xl"
+                  className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-slate-100 rounded-xl"
                 >
                   {isAr ? 'إلغاء' : 'Annuler'}
                 </button>

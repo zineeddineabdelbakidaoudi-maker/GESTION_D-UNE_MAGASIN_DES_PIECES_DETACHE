@@ -110,7 +110,7 @@ export const SuppliersPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+          <h1 className="text-xl font-black text-slate-100 tracking-tight flex items-center gap-2">
             <Building2 className="w-5 h-5 text-blue-400" />
             <span>{isAr ? 'إدارة الموردين والديون المستحقة' : 'Gestion des Fournisseurs & Dettes'}</span>
           </h1>
@@ -140,7 +140,7 @@ export const SuppliersPage: React.FC = () => {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder={isAr ? 'ابحث باسم المورد أو رقم الهاتف...' : 'Rechercher par nom de fournisseur, téléphone...'}
-              className="w-full bg-transparent text-xs font-medium text-white outline-none placeholder-slate-500"
+              className="w-full bg-transparent text-xs font-medium text-slate-100 outline-none placeholder-slate-500"
             />
           </div>
 
@@ -168,7 +168,7 @@ export const SuppliersPage: React.FC = () => {
                       }`}
                       title={isAr ? 'انقر مرتين لفتح كشف حساب المورد الكامل' : 'Double-cliquez pour ouvrir le dossier complet'}
                     >
-                      <td className="px-4 py-3 font-bold text-white">{s.name}</td>
+                      <td className="px-4 py-3 font-bold text-slate-100">{s.name}</td>
                       <td className="px-4 py-3 font-mono text-slate-300">{s.phone || '-'}</td>
                       <td className="px-4 py-3 text-slate-400">{s.address || '-'}</td>
                       <td className="px-4 py-3 text-right font-mono font-bold">
@@ -216,7 +216,7 @@ export const SuppliersPage: React.FC = () => {
             <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm space-y-4">
               <div className="flex items-start justify-between border-b border-slate-800 pb-3">
                 <div>
-                  <h3 className="font-bold text-white text-base">{selectedSupplier.name}</h3>
+                  <h3 className="font-bold text-slate-100 text-base">{selectedSupplier.name}</h3>
                   <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
                     <Phone className="w-3 h-3 text-slate-500" />
                     <span>{selectedSupplier.phone || 'Non renseigné'}</span>
@@ -260,7 +260,7 @@ export const SuppliersPage: React.FC = () => {
                   {transactions.map(tx => (
                     <div key={tx.id} className="py-2 px-1 flex items-center justify-between">
                       <div>
-                        <div className="font-semibold text-white">
+                        <div className="font-semibold text-slate-100">
                           {tx.type === 'achat' ? (isAr ? 'سند شراء (فاتورة)' : 'Arrivage Achat') : (isAr ? 'تسديد دفعة' : 'Règlement')}
                         </div>
                         <div className="text-[10px] text-slate-500 font-mono">
@@ -299,7 +299,7 @@ export const SuppliersPage: React.FC = () => {
                   <Building2 className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-black text-white">{selectedSupplier.name}</h2>
+                  <h2 className="text-lg font-black text-slate-100">{selectedSupplier.name}</h2>
                   <p className="text-xs text-slate-400 flex items-center gap-3 mt-1">
                     <span>📞 {selectedSupplier.phone || 'Sans téléphone'}</span>
                     <span>📍 {selectedSupplier.address || 'Sans adresse'}</span>
@@ -316,7 +316,7 @@ export const SuppliersPage: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setShowDossierModal(false)}
-                  className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
+                  className="p-2 text-slate-400 hover:text-slate-100 rounded-xl hover:bg-slate-800 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -362,7 +362,7 @@ export const SuppliersPage: React.FC = () => {
                 className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
                   dossierTab === 'all'
                     ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-slate-400 hover:text-white'
+                    : 'border-transparent text-slate-400 hover:text-slate-100'
                 }`}
               >
                 {isAr ? 'سجل العمليات الكامل (Grand Livre)' : 'Journal Complet (Grand Livre)'}
@@ -372,7 +372,7 @@ export const SuppliersPage: React.FC = () => {
                 className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
                   dossierTab === 'purchases'
                     ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-slate-400 hover:text-white'
+                    : 'border-transparent text-slate-400 hover:text-slate-100'
                 }`}
               >
                 {isAr ? 'سندات الشراء والفواتير' : 'Bons d\'Arrivage / Factures'}
@@ -382,7 +382,7 @@ export const SuppliersPage: React.FC = () => {
                 className={`px-4 py-2 text-xs font-bold border-b-2 transition-all ${
                   dossierTab === 'versements'
                     ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-slate-400 hover:text-white'
+                    : 'border-transparent text-slate-400 hover:text-slate-100'
                 }`}
               >
                 {isAr ? 'سجل التسديدات' : 'Règlements Effectués'}
@@ -440,7 +440,7 @@ export const SuppliersPage: React.FC = () => {
                     supplierPurchases.map((p: any) => (
                       <div key={p.id} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
                         <div className="flex items-center justify-between text-xs border-b border-slate-800 pb-2">
-                          <div className="font-bold text-white">
+                          <div className="font-bold text-slate-100">
                             Arrivage #{p.id} • <span className="text-slate-400 font-mono">{new Date(p.createdAt || p.created_at).toLocaleString('fr-DZ')}</span>
                           </div>
                           <div className="flex items-center gap-3">
@@ -465,7 +465,7 @@ export const SuppliersPage: React.FC = () => {
                                   <td className="py-1 font-sans text-slate-200">{it.productName || it.product_name || `Article #${it.productId || it.product_id}`}</td>
                                   <td className="py-1 text-center font-bold text-emerald-400">+{it.qty}</td>
                                   <td className="py-1 text-right">{formatDZD(it.unitCost || it.unit_cost)}</td>
-                                  <td className="py-1 text-right text-white">{formatDZD(it.lineTotal || it.line_total)}</td>
+                                  <td className="py-1 text-right text-slate-100">{formatDZD(it.lineTotal || it.line_total)}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -509,7 +509,7 @@ export const SuppliersPage: React.FC = () => {
             <div className="p-4 border-t border-slate-800 bg-slate-950 flex justify-end">
               <button
                 onClick={() => setShowDossierModal(false)}
-                className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition-colors"
+                className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold rounded-xl transition-colors"
               >
                 Fermer
               </button>
@@ -521,13 +521,13 @@ export const SuppliersPage: React.FC = () => {
       {/* Modal: New Supplier */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 text-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+          <div className="bg-slate-900 border border-slate-800 text-slate-100 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-base font-black text-white flex items-center gap-2">
+              <h3 className="text-base font-black text-slate-100 flex items-center gap-2">
                 <Plus className="w-5 h-5 text-blue-400" />
                 <span>{isAr ? 'إضافة مورد جديد' : 'Nouveau Fournisseur'}</span>
               </h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-100">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -541,7 +541,7 @@ export const SuppliersPage: React.FC = () => {
                   placeholder={isAr ? 'مثال: شركة النصر للاستيراد' : 'Ex: Sarl Import Moto'}
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none"
+                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-100 outline-none"
                 />
               </div>
 
@@ -552,7 +552,7 @@ export const SuppliersPage: React.FC = () => {
                   placeholder="0550 00 00 00"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white outline-none"
+                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-100 outline-none"
                 />
               </div>
 
@@ -563,7 +563,7 @@ export const SuppliersPage: React.FC = () => {
                   placeholder={isAr ? 'المنطقة الصناعية' : 'Zone Industrielle'}
                   value={address}
                   onChange={e => setAddress(e.target.value)}
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none"
                 />
               </div>
 
@@ -571,7 +571,7 @@ export const SuppliersPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white rounded-xl"
+                  className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-slate-100 rounded-xl"
                 >
                   {isAr ? 'إلغاء' : 'Annuler'}
                 </button>
@@ -590,20 +590,20 @@ export const SuppliersPage: React.FC = () => {
       {/* Modal: Versement */}
       {showVersementModal && selectedSupplier && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 text-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+          <div className="bg-slate-900 border border-slate-800 text-slate-100 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-base font-black text-white flex items-center gap-2">
+              <h3 className="text-base font-black text-slate-100 flex items-center gap-2">
                 <DollarSign className="w-5 h-5 text-emerald-400" />
                 <span>{isAr ? 'تسجيل تسديد للمورد' : 'Règlement Fournisseur'}</span>
               </h3>
-              <button onClick={() => setShowVersementModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowVersementModal(false)} className="text-slate-400 hover:text-slate-100">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
               <span className="text-slate-400">{isAr ? 'المورد :' : 'Fournisseur :'} </span>
-              <span className="font-bold text-white">{selectedSupplier.name}</span> • 
+              <span className="font-bold text-slate-100">{selectedSupplier.name}</span> • 
               <span className="text-slate-400"> {isAr ? 'المستحقات المتبقية :' : 'Solde dû :'} </span>
               <span className="font-mono font-bold text-rose-400">{formatDZD(selectedSupplier.currentDebt || 0)}</span>
             </div>
@@ -630,7 +630,7 @@ export const SuppliersPage: React.FC = () => {
                   placeholder={isAr ? 'مثال: تسديد نقدي للدفعة' : 'Ex: Règlement chèque #1234'}
                   value={versementNote}
                   onChange={e => setVersementNote(e.target.value)}
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none"
                 />
               </div>
 
@@ -638,7 +638,7 @@ export const SuppliersPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowVersementModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white rounded-xl"
+                  className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-slate-100 rounded-xl"
                 >
                   {isAr ? 'إلغاء' : 'Annuler'}
                 </button>

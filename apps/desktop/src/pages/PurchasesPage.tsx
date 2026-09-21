@@ -221,12 +221,12 @@ export const PurchasesPage: React.FC = () => {
   });
 
   return (
-    <div className={`p-6 space-y-6 h-full overflow-y-auto ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+    <div className={`p-6 space-y-6 h-full overflow-y-auto ${'bg-slate-950 text-slate-100'}`}>
       {/* Top Header with Tab Switcher */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className={`text-xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <h1 className={`text-xl font-black tracking-tight ${'text-slate-100'}`}>
               {isAr ? 'سندات الشراء وإدارة التوريدات' : 'Bons d\'Achat & Réassorts Fournisseurs'}
             </h1>
             <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 text-[11px] font-bold rounded-full border border-emerald-500/30">
@@ -270,7 +270,7 @@ export const PurchasesPage: React.FC = () => {
           <div className="lg:col-span-2 space-y-4">
             {/* Add Item Card */}
             <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm space-y-4">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
                 <Boxes className="w-4 h-4 text-blue-400" />
                 <span>{isAr ? 'اختيار القطعة المراد إضافتها للسند' : 'Sélectionner une pièce à ajouter'}</span>
               </h3>
@@ -315,13 +315,13 @@ export const PurchasesPage: React.FC = () => {
                         }
                       }}
                       placeholder={isAr ? 'ابحث عن قطعة بالاسم أو الرمز (مثال: BOUGIE, HUILE, FLT...)' : 'Rechercher une pièce par nom, code article, ou code-barres...'}
-                      className="w-full bg-slate-800 border border-slate-700 focus:border-blue-500 rounded-xl pl-9 pr-9 py-2 text-xs font-bold text-white outline-none transition-all placeholder-slate-500"
+                      className="w-full bg-slate-800 border border-slate-700 focus:border-blue-500 rounded-xl pl-9 pr-9 py-2 text-xs font-bold text-slate-100 outline-none transition-all placeholder-slate-500"
                     />
                     {productSearchQuery && (
                       <button
                         type="button"
                         onClick={handleClearSelectedProduct}
-                        className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-100"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -351,7 +351,7 @@ export const PurchasesPage: React.FC = () => {
                                   {p.code}
                                 </span>
                                 <div>
-                                  <div className="text-xs font-bold text-white">{p.name}</div>
+                                  <div className="text-xs font-bold text-slate-100">{p.name}</div>
                                   <div className="text-[10px] text-slate-400">
                                     {p.brandName || 'Générique'} {p.location ? `• Emplacement: ${p.location}` : ''}
                                   </div>
@@ -377,7 +377,7 @@ export const PurchasesPage: React.FC = () => {
                     <div className="mt-2 p-2 rounded-xl bg-blue-950/40 border border-blue-800/40 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span className="font-bold text-white">{selectedProduct.code} - {selectedProduct.name}</span>
+                        <span className="font-bold text-slate-100">{selectedProduct.code} - {selectedProduct.name}</span>
                         {selectedProduct.brandName && (
                           <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">{selectedProduct.brandName}</span>
                         )}
@@ -429,7 +429,7 @@ export const PurchasesPage: React.FC = () => {
                         handleAddItem(e);
                       }
                     }}
-                    className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-center text-white outline-none focus:border-blue-500"
+                    className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-center text-slate-100 outline-none focus:border-blue-500"
                   />
                 </div>
 
@@ -485,7 +485,7 @@ export const PurchasesPage: React.FC = () => {
                     {items.map((it, idx) => (
                       <tr key={idx} className="hover:bg-slate-800/40">
                         <td className="px-4 py-3 font-mono font-bold text-blue-400">{it.productCode}</td>
-                        <td className="px-4 py-3 font-bold text-white">{it.productName}</td>
+                        <td className="px-4 py-3 font-bold text-slate-100">{it.productName}</td>
                         <td className="px-4 py-3 text-center font-mono font-bold text-emerald-400">+{it.qty}</td>
                         <td className="px-4 py-3 text-right font-mono text-slate-300">{formatDZD(it.unitCost)}</td>
                         <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">{formatDZD(it.qty * it.unitCost)}</td>
@@ -544,7 +544,7 @@ export const PurchasesPage: React.FC = () => {
           {/* Right Column: Supplier & Payment Summary */}
           <div className="space-y-4">
             <form onSubmit={handleSubmitPurchase} className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm space-y-4">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
                 <Truck className="w-4 h-4 text-emerald-400" />
                 <span>{isAr ? 'بيانات المورد والدفع' : 'Fournisseur & Modalités'}</span>
               </h3>
@@ -555,7 +555,7 @@ export const PurchasesPage: React.FC = () => {
                   required
                   value={selectedSupplierId}
                   onChange={e => setSelectedSupplierId(parseInt(e.target.value, 10))}
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none"
+                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-100 outline-none"
                 >
                   <option value="">{isAr ? '-- اختر المورد --' : '-- Sélectionner le fournisseur --'}</option>
                   {suppliers.map(s => (
@@ -614,7 +614,7 @@ export const PurchasesPage: React.FC = () => {
               <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800 space-y-2 text-xs">
                 <div className="flex justify-between text-slate-400">
                   <span>{isAr ? 'إجمالي السند :' : 'Total Facture Achat :'}</span>
-                  <span className="font-mono font-bold text-white">{formatDZD(subtotalCentimes)}</span>
+                  <span className="font-mono font-bold text-slate-100">{formatDZD(subtotalCentimes)}</span>
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>{isAr ? 'المدفوع :' : 'Montant Réglé :'}</span>
@@ -657,7 +657,7 @@ export const PurchasesPage: React.FC = () => {
               value={historySearch}
               onChange={e => setHistorySearch(e.target.value)}
               placeholder={isAr ? 'ابحث في السندات باسم المورد، رقم السند، اسم القطعة...' : 'Rechercher par fournisseur, N° de bon, pièce...'}
-              className="w-full bg-transparent text-xs font-medium text-white outline-none placeholder-slate-500"
+              className="w-full bg-transparent text-xs font-medium text-slate-100 outline-none placeholder-slate-500"
             />
           </div>
 
@@ -670,7 +670,7 @@ export const PurchasesPage: React.FC = () => {
                     <span className="font-mono font-black text-blue-400 bg-blue-500/20 px-2.5 py-1 rounded-lg border border-blue-500/30">
                       BON ACHAT #{pur.id}
                     </span>
-                    <span className="font-bold text-white text-sm">{pur.supplierName}</span>
+                    <span className="font-bold text-slate-100 text-sm">{pur.supplierName}</span>
                     <span className="text-slate-400">({pur.supplierPhone || 'Sans tél'})</span>
                   </div>
 
@@ -707,7 +707,7 @@ export const PurchasesPage: React.FC = () => {
                         {pur.items?.map((it: any) => (
                           <tr key={it.id} className="hover:bg-slate-800/30">
                             <td className="px-3 py-2 font-mono font-bold text-blue-400">{it.productCode}</td>
-                            <td className="px-3 py-2 font-semibold text-white">{it.productName}</td>
+                            <td className="px-3 py-2 font-semibold text-slate-100">{it.productName}</td>
                             <td className="px-3 py-2 text-center font-mono font-bold text-emerald-400">+{it.qty}</td>
                             <td className="px-3 py-2 text-right font-mono text-slate-300">{formatDZD(it.unit_cost || it.unitCost)}</td>
                             <td className="px-3 py-2 text-right font-mono font-bold text-emerald-400">{formatDZD(it.line_total || it.lineTotal || (it.qty * it.unit_cost))}</td>
@@ -721,7 +721,7 @@ export const PurchasesPage: React.FC = () => {
                   <div className="flex flex-wrap items-center justify-end gap-6 pt-3 border-t border-slate-800 text-xs">
                     <div>
                       <span className="text-slate-400">{isAr ? 'إجمالي الفاتورة :' : 'Total Facture :'} </span>
-                      <span className="font-mono font-black text-white text-sm">{formatDZD(pur.total)}</span>
+                      <span className="font-mono font-black text-slate-100 text-sm">{formatDZD(pur.total)}</span>
                     </div>
                     <div>
                       <span className="text-slate-400">{isAr ? 'المبلغ المسدد :' : 'Payé :'} </span>

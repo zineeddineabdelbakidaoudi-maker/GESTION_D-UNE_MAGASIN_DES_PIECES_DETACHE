@@ -121,20 +121,20 @@ export const ReportsPage: React.FC = () => {
     doc.save(`Rapport_${period}_${Date.now()}.pdf`);
   };
 
-  const baseCls = isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900';
-  const cardCls = isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200';
-  const subCardCls = isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-100';
+  const baseCls = 'bg-slate-950 text-slate-100';
+  const cardCls = 'bg-slate-900 border-slate-800';
+  const subCardCls = 'bg-slate-950 border-slate-800';
 
   return (
     <div className={`p-6 space-y-6 h-full overflow-y-auto ${baseCls}`}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className={`text-xl font-black tracking-tight flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+          <h1 className={`text-xl font-black tracking-tight flex items-center gap-2 ${'text-slate-100'}`}>
             <TrendingUp className="w-5 h-5 text-emerald-400" />
             <span>{isAr ? 'التقارير المالية ومؤشرات الأداء' : 'Rapports Financiers & Rentabilité'}</span>
           </h1>
-          <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+          <p className={`text-xs mt-1 ${'text-slate-400'}`}>
             {isAr ? 'تحليل المبيعات، المصاريف، الأرباح الصافية، والديون المستحقة' : 'Chiffre d\'affaires, charges & dépenses, bénéfice net réel, dettes et top ventes.'}
           </p>
         </div>
@@ -151,7 +151,7 @@ export const ReportsPage: React.FC = () => {
                 key={p.id}
                 onClick={() => setPeriod(p.id as any)}
                 className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
-                  period === p.id ? 'bg-blue-600 text-white shadow' : (isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900')
+                  period === p.id ? 'bg-blue-600 text-white shadow' : ('text-slate-400 hover:text-slate-200')
                 }`}
               >
                 {p.label}
@@ -173,17 +173,17 @@ export const ReportsPage: React.FC = () => {
       {reportData && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className={`p-4 rounded-2xl border shadow-sm space-y-2 ${cardCls}`}>
-            <div className={`flex items-center justify-between ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <div className={`flex items-center justify-between ${'text-slate-400'}`}>
               <span className="text-xs font-bold uppercase">{isAr ? 'رقم الأعمال' : 'Chiffre d\'Affaires'}</span>
               <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
                 <DollarSign className="w-4 h-4" />
               </div>
             </div>
-            <div className={`text-xl font-black font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{formatDZD(reportData.totalCA || 0)}</div>
+            <div className={`text-xl font-black font-mono ${'text-slate-100'}`}>{formatDZD(reportData.totalCA || 0)}</div>
           </div>
 
           <div className={`p-4 rounded-2xl border shadow-sm space-y-2 ${cardCls}`}>
-            <div className={`flex items-center justify-between ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <div className={`flex items-center justify-between ${'text-slate-400'}`}>
               <span className="text-xs font-bold uppercase">{isAr ? 'المصاريف والنفقات' : 'Dépenses & Charges'}</span>
               <div className="w-8 h-8 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center">
                 <TrendingDown className="w-4 h-4" />
@@ -193,7 +193,7 @@ export const ReportsPage: React.FC = () => {
           </div>
 
           <div className={`p-4 rounded-2xl border shadow-sm space-y-2 ${cardCls}`}>
-            <div className={`flex items-center justify-between ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <div className={`flex items-center justify-between ${'text-slate-400'}`}>
               <span className="text-xs font-bold uppercase">{isAr ? 'الأرباح الصافية' : 'Bénéfice Net Réel'}</span>
               <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
                 <TrendingUp className="w-4 h-4" />
@@ -203,17 +203,17 @@ export const ReportsPage: React.FC = () => {
           </div>
 
           <div className={`p-4 rounded-2xl border shadow-sm space-y-2 ${cardCls}`}>
-            <div className={`flex items-center justify-between ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <div className={`flex items-center justify-between ${'text-slate-400'}`}>
               <span className="text-xs font-bold uppercase">{isAr ? 'عدد المبيعات' : 'Ventes Réalisées'}</span>
               <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
                 <ShoppingCart className="w-4 h-4" />
               </div>
             </div>
-            <div className={`text-xl font-black font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{reportData.salesCount || 0}</div>
+            <div className={`text-xl font-black font-mono ${'text-slate-100'}`}>{reportData.salesCount || 0}</div>
           </div>
 
           <div className={`p-4 rounded-2xl border shadow-sm space-y-2 ${cardCls}`}>
-            <div className={`flex items-center justify-between ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <div className={`flex items-center justify-between ${'text-slate-400'}`}>
               <span className="text-xs font-bold uppercase">{isAr ? 'ديون الزبائن' : 'Dettes Clients'}</span>
               <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
                 <CreditCard className="w-4 h-4" />
@@ -228,7 +228,7 @@ export const ReportsPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Revenue Trend Chart */}
         <div className={`lg:col-span-2 p-5 rounded-2xl border shadow-sm space-y-4 ${cardCls}`}>
-          <h3 className={`text-sm font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+          <h3 className={`text-sm font-bold flex items-center gap-2 ${'text-slate-100'}`}>
             <Calendar className="w-4 h-4 text-blue-400" />
             <span>{isAr ? 'منحنى تطور المبيعات والأرباح' : 'Évolution des Recettes & Bénéfices'}</span>
           </h3>
@@ -236,11 +236,11 @@ export const ReportsPage: React.FC = () => {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={reportData?.chartData || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#e2e8f0'} />
+                <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#cbd5e1'} />
                 <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
                 <YAxis stroke="#94a3b8" fontSize={11} tickFormatter={v => `${(v / 100).toLocaleString('fr-DZ')} DA`} />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: isDark ? '#0f172a' : '#ffffff', borderColor: isDark ? '#334155' : '#cbd5e1', borderRadius: '12px', color: isDark ? '#fff' : '#0f172a' }}
+                  contentStyle={{ backgroundColor: isDark ? '#0f172a' : '#ffffff', borderColor: isDark ? '#334155' : '#cbd5e1', borderRadius: '12px', color: isDark ? '#ffffff' : '#0f172a' }}
                   formatter={(value: any) => formatDZD(Number(value))}
                 />
                 <Legend />
@@ -253,7 +253,7 @@ export const ReportsPage: React.FC = () => {
 
         {/* Top Products */}
         <div className={`p-5 rounded-2xl border shadow-sm space-y-4 ${cardCls}`}>
-          <h3 className={`text-sm font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+          <h3 className={`text-sm font-bold flex items-center gap-2 ${'text-slate-100'}`}>
             <Award className="w-4 h-4 text-amber-400" />
             <span>{isAr ? 'أكثر المنتجات مبيعاً' : 'Top Articles les Plus Vendus'}</span>
           </h3>
@@ -262,7 +262,7 @@ export const ReportsPage: React.FC = () => {
             {reportData?.topProducts?.map((p: any, idx: number) => (
               <div key={idx} className={`p-3 rounded-xl border flex items-center justify-between text-xs ${subCardCls}`}>
                 <div>
-                  <div className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{p.productName}</div>
+                  <div className={`font-bold ${'text-slate-100'}`}>{p.productName}</div>
                   <div className="text-[10px] text-slate-400 font-mono">{p.code} • {p.qtySold} {isAr ? 'قطعة مباعة' : 'unités vendues'}</div>
                 </div>
                 <span className="font-mono font-black text-emerald-400">{formatDZD(p.revenue)}</span>

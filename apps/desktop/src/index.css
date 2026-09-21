@@ -25,6 +25,156 @@
   --gv-danger: 220 38 38;
   --gv-danger-soft: 254 226 226;
 
+
+  /* Échelle « slate » en mode clair : l'ordre est inversé par rapport au mode
+     sombre, si bien qu'un `bg-slate-900` (surface sombre) devient une surface
+     claire, et un `text-slate-100` (texte clair) devient un texte foncé. */
+  --s-950: 248 250 252;
+  --s-900: 255 255 255;
+  --s-800: 241 245 249;
+  --s-700: 214 222 232;
+  --s-600: 176 190 205;
+  --s-500: 130 145 165;
+  --s-400: 90 105 125;
+  --s-300: 51 65 85;
+  --s-200: 30 41 59;
+  --s-100: 15 23 42;
+  --s-50: 2 6 23;
+
+
+  /* Teintes d'accent — mode clair : les nuances pensees pour un fond sombre
+     sont remplacees par des nuances lisibles sur fond clair. */
+  /* blue */
+  --blue-200: 29 78 216;
+  --blue-300: 29 78 216;
+  --blue-400: 37 99 235;
+  --blue-500: 37 99 235;
+  --blue-600: 37 99 235;
+  --blue-700: 29 78 216;
+  --blue-800: 191 219 254;
+  --blue-900: 219 234 254;
+  --blue-950: 239 246 255;
+  /* emerald */
+  --emerald-200: 4 120 87;
+  --emerald-300: 4 120 87;
+  --emerald-400: 5 150 105;
+  --emerald-500: 5 150 105;
+  --emerald-600: 5 150 105;
+  --emerald-700: 4 120 87;
+  --emerald-800: 167 243 208;
+  --emerald-900: 209 250 229;
+  --emerald-950: 236 253 245;
+  /* rose */
+  --rose-200: 190 18 60;
+  --rose-300: 190 18 60;
+  --rose-400: 225 29 72;
+  --rose-500: 225 29 72;
+  --rose-600: 225 29 72;
+  --rose-700: 190 18 60;
+  --rose-800: 254 205 211;
+  --rose-900: 255 228 230;
+  --rose-950: 255 241 242;
+  /* amber */
+  --amber-200: 180 83 9;
+  --amber-300: 180 83 9;
+  --amber-400: 217 119 6;
+  --amber-500: 217 119 6;
+  --amber-600: 217 119 6;
+  --amber-700: 180 83 9;
+  --amber-800: 253 230 138;
+  --amber-900: 254 243 199;
+  --amber-950: 255 251 235;
+  /* red */
+  --red-200: 185 28 28;
+  --red-300: 185 28 28;
+  --red-400: 220 38 38;
+  --red-500: 220 38 38;
+  --red-600: 220 38 38;
+  --red-700: 185 28 28;
+  --red-800: 254 202 202;
+  --red-900: 254 226 226;
+  --red-950: 254 242 242;
+  /* green */
+  --green-200: 21 128 61;
+  --green-300: 21 128 61;
+  --green-400: 22 163 74;
+  --green-500: 22 163 74;
+  --green-600: 22 163 74;
+  --green-700: 21 128 61;
+  --green-800: 187 247 208;
+  --green-900: 220 252 231;
+  --green-950: 240 253 244;
+  /* cyan */
+  --cyan-200: 14 116 144;
+  --cyan-300: 14 116 144;
+  --cyan-400: 8 145 178;
+  --cyan-500: 8 145 178;
+  --cyan-600: 8 145 178;
+  --cyan-700: 14 116 144;
+  --cyan-800: 165 243 252;
+  --cyan-900: 207 250 254;
+  --cyan-950: 236 254 255;
+  /* violet */
+  --violet-200: 109 40 217;
+  --violet-300: 109 40 217;
+  --violet-400: 124 58 237;
+  --violet-500: 124 58 237;
+  --violet-600: 124 58 237;
+  --violet-700: 109 40 217;
+  --violet-800: 221 214 254;
+  --violet-900: 237 233 254;
+  --violet-950: 245 243 255;
+  /* indigo */
+  --indigo-200: 67 56 202;
+  --indigo-300: 67 56 202;
+  --indigo-400: 79 70 229;
+  --indigo-500: 79 70 229;
+  --indigo-600: 79 70 229;
+  --indigo-700: 67 56 202;
+  --indigo-800: 199 210 254;
+  --indigo-900: 224 231 255;
+  --indigo-950: 238 242 255;
+  /* purple */
+  --purple-200: 126 34 206;
+  --purple-300: 126 34 206;
+  --purple-400: 147 51 234;
+  --purple-500: 147 51 234;
+  --purple-600: 147 51 234;
+  --purple-700: 126 34 206;
+  --purple-800: 233 213 255;
+  --purple-900: 243 232 255;
+  --purple-950: 250 245 255;
+  /* orange */
+  --orange-200: 194 65 12;
+  --orange-300: 194 65 12;
+  --orange-400: 234 88 12;
+  --orange-500: 234 88 12;
+  --orange-600: 234 88 12;
+  --orange-700: 194 65 12;
+  --orange-800: 254 215 170;
+  --orange-900: 255 237 213;
+  --orange-950: 255 247 237;
+  /* sky */
+  --sky-200: 3 105 161;
+  --sky-300: 3 105 161;
+  --sky-400: 2 132 199;
+  --sky-500: 2 132 199;
+  --sky-600: 2 132 199;
+  --sky-700: 3 105 161;
+  --sky-800: 186 230 253;
+  --sky-900: 224 242 254;
+  --sky-950: 240 249 255;
+  /* teal */
+  --teal-200: 15 118 110;
+  --teal-300: 15 118 110;
+  --teal-400: 13 148 136;
+  --teal-500: 13 148 136;
+  --teal-600: 13 148 136;
+  --teal-700: 15 118 110;
+  --teal-800: 153 246 228;
+  --teal-900: 204 251 241;
+  --teal-950: 240 253 250;
+
   --gv-radius: 0.875rem;
   --gv-shadow: 0 1px 2px rgb(15 23 42 / 0.06), 0 8px 24px -12px rgb(15 23 42 / 0.18);
   --gv-shadow-lg: 0 24px 48px -20px rgb(15 23 42 / 0.35);
@@ -47,6 +197,153 @@
   --gv-warning-soft: 69 26 3;
   --gv-danger: 248 113 113;
   --gv-danger-soft: 69 10 10;
+
+
+  /* Échelle « slate » d'origine (Tailwind), utilisée en mode sombre. */
+  --s-950: 2 6 23;
+  --s-900: 15 23 42;
+  --s-800: 30 41 59;
+  --s-700: 51 65 85;
+  --s-600: 71 85 105;
+  --s-500: 100 116 139;
+  --s-400: 148 163 184;
+  --s-300: 203 213 225;
+  --s-200: 226 232 240;
+  --s-100: 241 245 249;
+  --s-50: 248 250 252;
+
+
+  /* Teintes d'accent — palette Tailwind d'origine (mode sombre). */
+  /* blue */
+  --blue-200: 191 219 254;
+  --blue-300: 147 197 253;
+  --blue-400: 96 165 250;
+  --blue-500: 59 130 246;
+  --blue-600: 37 99 235;
+  --blue-700: 29 78 216;
+  --blue-800: 30 64 175;
+  --blue-900: 30 58 138;
+  --blue-950: 23 37 84;
+  /* emerald */
+  --emerald-200: 167 243 208;
+  --emerald-300: 110 231 183;
+  --emerald-400: 52 211 153;
+  --emerald-500: 16 185 129;
+  --emerald-600: 5 150 105;
+  --emerald-700: 4 120 87;
+  --emerald-800: 6 95 70;
+  --emerald-900: 6 78 59;
+  --emerald-950: 2 44 34;
+  /* rose */
+  --rose-200: 254 205 211;
+  --rose-300: 253 164 175;
+  --rose-400: 251 113 133;
+  --rose-500: 244 63 94;
+  --rose-600: 225 29 72;
+  --rose-700: 190 18 60;
+  --rose-800: 159 18 57;
+  --rose-900: 136 19 55;
+  --rose-950: 76 5 25;
+  /* amber */
+  --amber-200: 253 230 138;
+  --amber-300: 252 211 77;
+  --amber-400: 251 191 36;
+  --amber-500: 245 158 11;
+  --amber-600: 217 119 6;
+  --amber-700: 180 83 9;
+  --amber-800: 146 64 14;
+  --amber-900: 120 53 15;
+  --amber-950: 69 26 3;
+  /* red */
+  --red-200: 254 202 202;
+  --red-300: 252 165 165;
+  --red-400: 248 113 113;
+  --red-500: 239 68 68;
+  --red-600: 220 38 38;
+  --red-700: 185 28 28;
+  --red-800: 153 27 27;
+  --red-900: 127 29 29;
+  --red-950: 69 10 10;
+  /* green */
+  --green-200: 187 247 208;
+  --green-300: 134 239 172;
+  --green-400: 74 222 128;
+  --green-500: 34 197 94;
+  --green-600: 22 163 74;
+  --green-700: 21 128 61;
+  --green-800: 22 101 52;
+  --green-900: 20 83 45;
+  --green-950: 5 46 22;
+  /* cyan */
+  --cyan-200: 165 243 252;
+  --cyan-300: 103 232 249;
+  --cyan-400: 34 211 238;
+  --cyan-500: 6 182 212;
+  --cyan-600: 8 145 178;
+  --cyan-700: 14 116 144;
+  --cyan-800: 21 94 117;
+  --cyan-900: 22 78 99;
+  --cyan-950: 8 51 68;
+  /* violet */
+  --violet-200: 221 214 254;
+  --violet-300: 196 181 253;
+  --violet-400: 167 139 250;
+  --violet-500: 139 92 246;
+  --violet-600: 124 58 237;
+  --violet-700: 109 40 217;
+  --violet-800: 91 33 182;
+  --violet-900: 76 29 149;
+  --violet-950: 46 16 101;
+  /* indigo */
+  --indigo-200: 199 210 254;
+  --indigo-300: 165 180 252;
+  --indigo-400: 129 140 248;
+  --indigo-500: 99 102 241;
+  --indigo-600: 79 70 229;
+  --indigo-700: 67 56 202;
+  --indigo-800: 55 48 163;
+  --indigo-900: 49 46 129;
+  --indigo-950: 30 27 75;
+  /* purple */
+  --purple-200: 233 213 255;
+  --purple-300: 216 180 254;
+  --purple-400: 192 132 252;
+  --purple-500: 168 85 247;
+  --purple-600: 147 51 234;
+  --purple-700: 126 34 206;
+  --purple-800: 107 33 168;
+  --purple-900: 88 28 135;
+  --purple-950: 59 7 100;
+  /* orange */
+  --orange-200: 254 215 170;
+  --orange-300: 253 186 116;
+  --orange-400: 251 146 60;
+  --orange-500: 249 115 22;
+  --orange-600: 234 88 12;
+  --orange-700: 194 65 12;
+  --orange-800: 154 52 18;
+  --orange-900: 124 45 18;
+  --orange-950: 67 20 7;
+  /* sky */
+  --sky-200: 186 230 253;
+  --sky-300: 125 211 252;
+  --sky-400: 56 189 248;
+  --sky-500: 14 165 233;
+  --sky-600: 2 132 199;
+  --sky-700: 3 105 161;
+  --sky-800: 7 89 133;
+  --sky-900: 12 74 110;
+  --sky-950: 8 47 73;
+  /* teal */
+  --teal-200: 153 246 228;
+  --teal-300: 94 234 212;
+  --teal-400: 45 212 191;
+  --teal-500: 20 184 166;
+  --teal-600: 13 148 136;
+  --teal-700: 15 118 110;
+  --teal-800: 17 94 89;
+  --teal-900: 19 78 74;
+  --teal-950: 4 47 46;
 
   --gv-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
   --gv-shadow-lg: 0 24px 48px -20px rgb(0 0 0 / 0.75);
@@ -230,6 +527,65 @@
     @apply gv-badge;
     background-color: rgb(var(--gv-danger) / 0.14);
     color: rgb(var(--gv-danger));
+  }
+
+  /* ── Barre d'onglets principale ─────────────────────────────────
+     Reprend le principe des fenêtres de propriétés Windows : l'onglet actif
+     n'a pas de bordure basse, il est donc visuellement solidaire du contenu. */
+  .gv-tabstrip {
+    @apply shrink-0 relative;
+    background-color: rgb(var(--gv-surface-2));
+    border-bottom: 1px solid rgb(var(--gv-border-strong));
+    padding: 0.4rem 0.75rem 0;
+  }
+
+  .gv-tabstrip-list {
+    @apply flex items-end gap-0.5 overflow-x-auto;
+    /* La bordure basse de la barre passe sous les onglets inactifs. */
+    margin-bottom: -1px;
+  }
+
+  .gv-tab {
+    @apply inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold whitespace-nowrap
+           transition-colors relative shrink-0 select-none;
+    color: rgb(var(--gv-text-muted));
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-bottom-color: rgb(var(--gv-border-strong));
+    border-radius: 0.6rem 0.6rem 0 0;
+    max-width: 14rem;
+  }
+
+  .gv-tab:hover:not(.gv-tab-active) {
+    color: rgb(var(--gv-text));
+    background-color: rgb(var(--gv-surface) / 0.6);
+  }
+
+  .gv-tab-active {
+    color: rgb(var(--gv-accent));
+    background-color: rgb(var(--gv-surface));
+    border-color: rgb(var(--gv-border-strong));
+    /* Le fond du contenu remonte sous l'onglet : la jonction disparaît. */
+    border-bottom-color: rgb(var(--gv-surface));
+    font-weight: 800;
+  }
+
+  /* Liseré d'accent en haut de l'onglet actif, pour le repérer d'un coup d'œil. */
+  .gv-tab-active::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0.55rem;
+    top: -1px;
+    height: 2px;
+    border-radius: 2px;
+    background-color: rgb(var(--gv-accent));
+  }
+
+  .gv-scroll-x {
+    scrollbar-width: thin;
+  }
+  .gv-scroll-x::-webkit-scrollbar {
+    height: 6px;
   }
 
   .gv-table {

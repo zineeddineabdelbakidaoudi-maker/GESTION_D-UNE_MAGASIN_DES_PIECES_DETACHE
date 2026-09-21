@@ -26,7 +26,7 @@ export const TrialBanner: React.FC = () => {
 
   if (trial.isExpired) {
     return (
-      <div className="fixed inset-0 z-50 bg-slate-950/98 backdrop-blur-md flex items-center justify-center p-6 text-white select-none">
+      <div className="fixed inset-0 z-50 bg-slate-950/98 backdrop-blur-md flex items-center justify-center p-6 text-slate-100 select-none">
         <div className="max-w-md w-full bg-slate-900 border border-red-500/50 rounded-2xl p-8 text-center shadow-2xl space-y-6">
           <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto border border-red-500/30 animate-pulse">
             <Lock className="w-8 h-8" />
@@ -50,16 +50,16 @@ export const TrialBanner: React.FC = () => {
   }
 
   return (
-    <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-900 px-4 py-1.5 text-xs font-medium flex items-center justify-between shrink-0">
+    <div className="bg-amber-500/15 border-b border-amber-500/40 px-4 py-1.5 text-xs font-medium flex items-center justify-between shrink-0 text-amber-500">
       <div className="flex items-center gap-2">
-        <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+        <Clock className="w-3.5 h-3.5 animate-pulse" />
         <span className="font-bold">{trial.message}</span>
-        <span className="text-amber-700 text-[11px] hidden md:inline">
+        <span className="text-[11px] opacity-80 hidden md:inline">
           (Démonstration fonctionnelle magasin)
         </span>
       </div>
-      <div className="flex items-center gap-1.5 text-[11px] text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-full border border-amber-300">
-        <ShieldAlert className="w-3 h-3 text-amber-600" />
+      <div className="flex items-center gap-1.5 text-[11px] bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/40">
+        <ShieldAlert className="w-3 h-3" />
         <span>Mode Démo Actif</span>
       </div>
     </div>

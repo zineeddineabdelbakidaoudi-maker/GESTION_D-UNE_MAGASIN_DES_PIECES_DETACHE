@@ -149,7 +149,7 @@ export const StockPage: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-black text-white tracking-tight">
+            <h1 className="text-xl font-black text-slate-100 tracking-tight">
               {isAr ? 'إدارة المخزون وتتبع الحركات' : 'Gestion des Stocks & Mouvements'}
             </h1>
             <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 text-[11px] font-bold rounded-full border border-emerald-500/30 flex items-center gap-1">
@@ -294,7 +294,7 @@ export const StockPage: React.FC = () => {
                   }`}>
                     <td className="px-4 py-3 font-mono font-bold text-blue-400">{s.productCode}</td>
                     <td className="px-4 py-3">
-                      <div className="font-bold text-white flex items-center gap-2">
+                      <div className="font-bold text-slate-100 flex items-center gap-2">
                         <span>{s.productName}</span>
                         {s.quantity <= 0 ? (
                           <span className="px-2 py-0.5 rounded-md bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[10px] font-extrabold animate-pulse">
@@ -396,7 +396,7 @@ export const StockPage: React.FC = () => {
                       {new Date(m.created_at || m.createdAt).toLocaleString('fr-DZ')}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-bold text-white">{m.productName}</div>
+                      <div className="font-bold text-slate-100">{m.productName}</div>
                       <div className="text-[10px] text-blue-400 font-mono">{m.productCode}</div>
                     </td>
                     <td className="px-4 py-3 font-medium text-slate-300">{m.storeName}</td>
@@ -429,19 +429,19 @@ export const StockPage: React.FC = () => {
       {/* Modal: Manual Stock Adjustment (Code 93) */}
       {showAdjustModal && adjustItem && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 text-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+          <div className="bg-slate-900 border border-slate-800 text-slate-100 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-black text-white flex items-center gap-2">
+              <h3 className="text-base font-black text-slate-100 flex items-center gap-2">
                 <Edit3 className="w-5 h-5 text-purple-400" />
                 <span>{isAr ? 'تعديل يدوي للمخزون (رمز 93)' : 'Ajustement Manuel de Stock (Code 93)'}</span>
               </h3>
-              <button onClick={() => setShowAdjustModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowAdjustModal(false)} className="text-slate-400 hover:text-slate-100">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="bg-slate-800/80 p-3.5 rounded-2xl text-xs space-y-1 border border-slate-700">
-              <div className="font-bold text-white">{adjustItem.productName}</div>
+              <div className="font-bold text-slate-100">{adjustItem.productName}</div>
               <div className="text-slate-400">
                 {isAr ? 'المخزون المسجل حالياً :' : 'Stock actuel enregistré :'} <b className="text-amber-400">{adjustItem.quantity} {isAr ? 'وحدة' : 'unités'}</b>
               </div>
@@ -468,7 +468,7 @@ export const StockPage: React.FC = () => {
                   placeholder={isAr ? 'مثال: جرد فعلي دوري' : 'Ex: Inventaire physique périodique'}
                   value={adjustNote}
                   onChange={e => setAdjustNote(e.target.value)}
-                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs outline-none text-white"
+                  className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs outline-none text-slate-100"
                 />
               </div>
 
@@ -476,7 +476,7 @@ export const StockPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowAdjustModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white rounded-xl"
+                  className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-slate-100 rounded-xl"
                 >
                   {isAr ? 'إلغاء' : 'Annuler'}
                 </button>

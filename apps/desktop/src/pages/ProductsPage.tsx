@@ -340,18 +340,18 @@ export const ProductsPage: React.FC = () => {
 
   return (
     <div className={`p-6 space-y-6 h-full overflow-y-auto transition-colors ${
-      isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
+      'bg-slate-950 text-slate-100'
     }`}>
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className={`text-xl font-black tracking-tight flex items-center gap-2 ${
-            isDark ? 'text-white' : 'text-slate-900'
+            'text-slate-100'
           }`}>
             <PackagePlus className="w-5 h-5 text-blue-500" />
             <span>{isAr ? 'كتالوج المنتجات والتقديرات الشكلية' : 'Catalogue Produits & Factures Proforma'}</span>
           </h1>
-          <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+          <p className={`text-xs mt-1 ${'text-slate-400'}`}>
             {isAr 
               ? 'إدارة القطع، الألوان، التوافق مع الموتوات، وإمكانية إضافة الصور ومواقع التخزين' 
               : 'Gestion des pièces, codes manuels, photos, emplacements en rayon et compatibilités motos.'}
@@ -362,7 +362,7 @@ export const ProductsPage: React.FC = () => {
           <button
             onClick={() => setShowProformaModal(true)}
             className={`flex items-center gap-2 px-4 py-2 border rounded-xl text-xs font-bold transition-all shadow-sm ${
-              isDark ? 'bg-slate-900 border-slate-800 text-emerald-400 hover:bg-slate-800' : 'bg-white border-slate-300 text-emerald-600 hover:bg-slate-50'
+              'bg-slate-900 border-slate-800 text-emerald-400 hover:bg-slate-800'
             }`}
           >
             <FileText className="w-4 h-4" />
@@ -383,7 +383,7 @@ export const ProductsPage: React.FC = () => {
 
       {/* Search Bar */}
       <div className={`p-3.5 rounded-2xl border shadow-sm flex items-center gap-3 ${
-        isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+        'bg-slate-900 border-slate-800'
       }`}>
         <Search className="w-5 h-5 text-slate-400" />
         <input
@@ -393,11 +393,11 @@ export const ProductsPage: React.FC = () => {
           onChange={e => setSearch(e.target.value)}
           placeholder={isAr ? 'ابحث برمز القطعة، الاسم، الماركة، أو الموتو المتوافقة...' : 'Rechercher par code article, désignation, marque, moto compatible ou code-barres...'}
           className={`w-full text-xs font-bold outline-none bg-transparent ${
-            isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
+            'text-slate-100 placeholder-slate-500'
           }`}
         />
         {search && (
-          <button onClick={() => setSearch('')} className="text-slate-400 hover:text-white">
+          <button onClick={() => setSearch('')} className="text-slate-400 hover:text-slate-100">
             <X className="w-4 h-4" />
           </button>
         )}
@@ -405,12 +405,12 @@ export const ProductsPage: React.FC = () => {
 
       {/* Products Table */}
       <div className={`rounded-2xl border shadow-sm overflow-hidden ${
-        isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+        'bg-slate-900 border-slate-800'
       }`}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className={`font-bold uppercase border-b ${
-              isDark ? 'bg-slate-800/80 text-slate-400 border-slate-800' : 'bg-slate-100 text-slate-600 border-slate-200'
+              'bg-slate-800/80 text-slate-400 border-slate-800'
             }`}>
               <tr>
                 <th className="px-3 py-3 text-center w-12 font-mono">{isAr ? 'المعرف' : 'ID'}</th>
@@ -427,7 +427,7 @@ export const ProductsPage: React.FC = () => {
                 {hasPermission('produits', 'edit') && <th className="px-4 py-3 text-center">{isAr ? 'تعديل' : 'Modifier'}</th>}
               </tr>
             </thead>
-            <tbody className={`divide-y ${isDark ? 'divide-slate-800' : 'divide-slate-200'}`}>
+            <tbody className={`divide-y ${'divide-slate-800'}`}>
               {products.map((p, idx) => {
                 const stockQty = p.stock?.find(s => s.storeId === (currentStore?.id || 1))?.quantity || 0;
                 const productLocation = (p as any).location || '';
@@ -437,7 +437,7 @@ export const ProductsPage: React.FC = () => {
                 return (
                   <tr 
                     key={p.id} 
-                    className={isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}
+                    className={'hover:bg-slate-800/50'}
                   >
                     <td className="px-3 py-3 text-center font-mono font-bold text-blue-400 text-xs w-12" title={`ID: ${p.id}`}>{p.id}</td>
                     <td className="px-4 py-3 font-mono font-bold text-blue-400 whitespace-nowrap">
@@ -453,7 +453,7 @@ export const ProductsPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{p.name}</div>
+                      <div className={`font-bold ${'text-slate-100'}`}>{p.name}</div>
                       
                       {/* Sub-line: Barcodes + Moto compat count with 2-second hover tooltip */}
                       <div className="flex items-center gap-2 mt-0.5">
@@ -487,7 +487,7 @@ export const ProductsPage: React.FC = () => {
                     <td className="px-4 py-3">
                       {productLocation ? (
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-lg font-mono font-black text-[11px] border ${
-                          isDark ? 'bg-amber-950/50 text-amber-300 border-amber-800/50' : 'bg-amber-50 text-amber-700 border-amber-200'
+                          'bg-amber-950/50 text-amber-300 border-amber-800/50'
                         }`}>
                           {productLocation}
                         </span>
@@ -496,12 +496,12 @@ export const ProductsPage: React.FC = () => {
                       )}
                     </td>
                     <td className="px-4 py-3 text-slate-400">
-                      {p.categoryName || '-'} • <span className={`font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{p.brandName || '-'}</span>
+                      {p.categoryName || '-'} • <span className={`font-semibold ${'text-slate-300'}`}>{p.brandName || '-'}</span>
                     </td>
                     <td className="px-4 py-3">
                       {(p.colors && p.colors.length > 0) ? (
                         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                          isDark ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
+                          'bg-slate-800 text-slate-300 border-slate-700'
                         }`}>
                           <div className="w-2 h-2 rounded-full border border-slate-600" style={{ backgroundColor: p.colors[0].hexCode }} />
                           <span>{p.colors[0].name}</span>
@@ -529,7 +529,7 @@ export const ProductsPage: React.FC = () => {
                           onClick={() => openEditModal(p)}
                           title={isAr ? 'تعديل المنتج' : 'Modifier le produit'}
                           className={`p-1.5 rounded-lg transition-colors ${
-                            isDark ? 'text-slate-400 hover:text-blue-400 hover:bg-blue-500/10' : 'text-slate-500 hover:text-blue-600 hover:bg-blue-50'
+                            'text-slate-400 hover:text-blue-400 hover:bg-blue-500/10'
                           }`}
                         >
                           <Pen className="w-3.5 h-3.5" />
@@ -555,7 +555,7 @@ export const ProductsPage: React.FC = () => {
             <div className="bg-slate-900/98 border border-blue-500/50 backdrop-blur-md rounded-2xl p-4 w-72 shadow-2xl shadow-blue-900/40 animate-in fade-in duration-200">
               <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-800">
                 <Bike className="w-4 h-4 text-blue-400" />
-                <p className="text-white font-bold text-xs line-clamp-1">{hoveredProductRow.name}</p>
+                <p className="text-slate-100 font-bold text-xs line-clamp-1">{hoveredProductRow.name}</p>
               </div>
               <p className="text-[10px] text-blue-400 font-bold uppercase mb-2">
                 {isAr ? `متوافق مع ${compat.length} طراز:` : `Modèles compatibles (${compat.length}):`}
@@ -577,13 +577,13 @@ export const ProductsPage: React.FC = () => {
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className={`border rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-6 shadow-2xl ${
-            isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-300 text-slate-900'
+            'bg-slate-900 border-slate-800 text-slate-100'
           }`}>
             <div className={`flex items-center justify-between border-b pb-3 ${
-              isDark ? 'border-slate-800' : 'border-slate-200'
+              'border-slate-800'
             }`}>
               <h3 className={`text-base font-black flex items-center gap-2 ${
-                isDark ? 'text-white' : 'text-slate-900'
+                'text-slate-100'
               }`}>
                 <PackagePlus className="w-5 h-5 text-blue-500" />
                 <span>{editingProduct 
@@ -593,7 +593,7 @@ export const ProductsPage: React.FC = () => {
               </h3>
               <button 
                 onClick={() => setShowAddModal(false)}
-                className={`p-1 rounded-lg ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
+                className={`p-1 rounded-lg ${'text-slate-400 hover:text-slate-100'}`}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -602,16 +602,16 @@ export const ProductsPage: React.FC = () => {
             <form onSubmit={handleCreateProduct} className="space-y-6">
               {/* Section 1: General Info */}
               <div className={`space-y-3 p-4 rounded-2xl border ${
-                isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                'bg-slate-950 border-slate-800'
               }`}>
-                <h4 className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                <h4 className={`text-xs font-bold uppercase tracking-wider ${'text-slate-300'}`}>
                   1. {isAr ? 'المعلومات الأساسية والأسعار' : 'Informations Générales & Tarification (DZD)'}
                 </h4>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {/* Row 1: Name | Code */}
                   <div>
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <label className={`text-[11px] font-bold ${'text-slate-300'}`}>
                       {isAr ? 'تعيين القطعة *' : 'Désignation de la pièce *'}
                     </label>
                     <input
@@ -622,7 +622,7 @@ export const ProductsPage: React.FC = () => {
                       value={name}
                       onChange={e => setName(e.target.value.toUpperCase())}
                       className={`w-full mt-1 border rounded-xl px-3.5 py-2 text-xs font-bold outline-none uppercase ${
-                        isDark ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                        'bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-500'
                       }`}
                     />
                   </div>
@@ -633,7 +633,7 @@ export const ProductsPage: React.FC = () => {
                       const nextPredictedCode = `ART-${String(nextPredictedId).padStart(5, '0')}`;
                       return (
                         <>
-                          <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                          <label className={`text-[11px] font-bold ${'text-slate-300'}`}>
                             {isAr 
                               ? `كود المقال (فارغ للتوليد التلقائي: ${nextPredictedCode})` 
                               : `Code Article (Manuel ou auto: ${nextPredictedCode})`}
@@ -647,7 +647,7 @@ export const ProductsPage: React.FC = () => {
                             className={`w-full mt-1 border rounded-xl px-3.5 py-2 text-xs font-mono font-bold outline-none uppercase ${
                               editingProduct ? 'opacity-50 cursor-not-allowed' : ''
                             } ${
-                              isDark ? 'bg-slate-800 border-slate-700 text-blue-400 placeholder-slate-500' : 'bg-white border-slate-300 text-blue-700 placeholder-slate-400'
+                              'bg-slate-800 border-slate-700 text-blue-400 placeholder-slate-500'
                             }`}
                           />
                         </>
@@ -657,14 +657,14 @@ export const ProductsPage: React.FC = () => {
 
                   {/* Row 2: Category | Brand */}
                   <div>
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <label className={`text-[11px] font-bold ${'text-slate-300'}`}>
                       {isAr ? 'الصنف / الفئة' : 'Catégorie'}
                     </label>
                     <select
                       value={categoryId}
                       onChange={e => setCategoryId(e.target.value ? parseInt(e.target.value, 10) : '')}
                       className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-bold outline-none ${
-                        isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                        'bg-slate-800 border-slate-700 text-slate-100'
                       }`}
                     >
                       <option value="">{isAr ? '-- اختر الصنف --' : '-- Choisir Catégorie --'}</option>
@@ -673,14 +673,14 @@ export const ProductsPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <label className={`text-[11px] font-bold ${'text-slate-300'}`}>
                       {isAr ? 'الماركة / الموتور' : 'Marque / Moteur'}
                     </label>
                     <select
                       value={brandId}
                       onChange={e => setBrandId(e.target.value ? parseInt(e.target.value, 10) : '')}
                       className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-bold outline-none ${
-                        isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                        'bg-slate-800 border-slate-700 text-slate-100'
                       }`}
                     >
                       <option value="">{isAr ? '-- اختر الماركة --' : '-- Choisir Marque --'}</option>
@@ -690,7 +690,7 @@ export const ProductsPage: React.FC = () => {
 
                   {/* Row 3: Prix Achat | Prix Vente Détail */}
                   <div>
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <label className={`text-[11px] font-bold ${'text-slate-300'}`}>
                       {isAr ? 'سعر الشراء (دج)' : 'Prix d\'Achat (DA)'}
                     </label>
                     <input
@@ -700,13 +700,13 @@ export const ProductsPage: React.FC = () => {
                       value={priceAchat}
                       onChange={e => setPriceAchat(e.target.value)}
                       className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none ${
-                        isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                        'bg-slate-800 border-slate-700 text-slate-100'
                       }`}
                     />
                   </div>
 
                   <div>
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <label className={`text-[11px] font-bold ${'text-slate-300'}`}>
                       {isAr ? 'سعر البيع بالتجزئة (دج) *' : 'Prix Vente Détail (DA) *'}
                     </label>
                     <input
@@ -717,14 +717,14 @@ export const ProductsPage: React.FC = () => {
                       value={priceDetail}
                       onChange={e => setPriceDetail(e.target.value)}
                       className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono font-bold text-emerald-500 outline-none ${
-                        isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'
+                        'bg-slate-800 border-slate-700'
                       }`}
                     />
                   </div>
 
                   {/* Row 4: Prix Gros | Prix Semi-Gros */}
                   <div>
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <label className={`text-[11px] font-bold ${'text-slate-300'}`}>
                       {isAr ? 'سعر الجملة (دج)' : 'Prix Vente Gros (DA)'}
                     </label>
                     <input
@@ -734,13 +734,13 @@ export const ProductsPage: React.FC = () => {
                       value={priceGros}
                       onChange={e => setPriceGros(e.target.value)}
                       className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono outline-none ${
-                        isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                        'bg-slate-800 border-slate-700 text-slate-100'
                       }`}
                     />
                   </div>
 
                   <div>
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <label className={`text-[11px] font-bold ${'text-slate-300'}`}>
                       {isAr ? 'سعر نصف الجملة (دج)' : 'Prix Semi-Gros (DA)'}
                     </label>
                     <input
@@ -750,21 +750,21 @@ export const ProductsPage: React.FC = () => {
                       value={priceSemiGros}
                       onChange={e => setPriceSemiGros(e.target.value)}
                       className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono outline-none ${
-                        isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                        'bg-slate-800 border-slate-700 text-slate-100'
                       }`}
                     />
                   </div>
 
                   {/* Row 5: Unité | Quantité initiale */}
                   <div>
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <label className={`text-[11px] font-bold ${'text-slate-300'}`}>
                       {isAr ? 'وحدة القياس' : 'Unité de Mesure'}
                     </label>
                     <select
                       value={unit}
                       onChange={e => setUnit(e.target.value)}
                       className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-bold outline-none ${
-                        isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                        'bg-slate-800 border-slate-700 text-slate-100'
                       }`}
                     >
                       <option value="PCS">PCS — Pièce</option>
@@ -777,7 +777,7 @@ export const ProductsPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <label className={`text-[11px] font-bold ${'text-slate-300'}`}>
                       {isAr ? 'الكمية الأولية' : 'Quantité Initiale (Stock)'}
                     </label>
                     <input
@@ -787,14 +787,14 @@ export const ProductsPage: React.FC = () => {
                       value={initialStockStore1}
                       onChange={e => setInitialStockStore1(e.target.value)}
                       className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none ${
-                        isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                        'bg-slate-800 border-slate-700 text-slate-100'
                       }`}
                     />
                   </div>
 
                   {/* Row 6: Emplacement (full width) */}
                   <div className="md:col-span-2">
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <label className={`text-[11px] font-bold ${'text-slate-300'}`}>
                       {isAr ? 'الموقع في المخزن (اختر أو اكتب جديد)' : 'Emplacement Rayon (choisir ou saisir nouveau — sera sauvegardé)'}
                     </label>
                     <div className="flex gap-2 mt-1">
@@ -805,7 +805,7 @@ export const ProductsPage: React.FC = () => {
                         value={location}
                         onChange={e => setLocation(e.target.value.toUpperCase())}
                         className={`flex-1 border rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none uppercase ${
-                          isDark ? 'bg-slate-800 border-slate-700 text-amber-300 placeholder-slate-500' : 'bg-white border-slate-300 text-amber-700 placeholder-slate-400'
+                          'bg-slate-800 border-slate-700 text-amber-300 placeholder-slate-500'
                         }`}
                       />
                       <button
@@ -818,7 +818,7 @@ export const ProductsPage: React.FC = () => {
                         }}
                         title="Sauvegarder cet emplacement pour usage futur"
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
-                          isDark ? 'bg-amber-600/20 text-amber-400 border-amber-500/40 hover:bg-amber-600/30' : 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
+                          'bg-amber-600/20 text-amber-400 border-amber-500/40 hover:bg-amber-600/30'
                         }`}
                       >
                         💾 {isAr ? 'حفظ' : 'Sauver'}
@@ -833,10 +833,10 @@ export const ProductsPage: React.FC = () => {
 
               {/* Section: Photo Upload */}
               <div className={`space-y-3 p-4 rounded-2xl border ${
-                isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                'bg-slate-950 border-slate-800'
               }`}>
                 <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                  isDark ? 'text-slate-300' : 'text-slate-700'
+                  'text-slate-300'
                 }`}>
                   <Camera className="w-3.5 h-3.5 text-blue-400" /> {isAr ? 'صورة المنتج' : 'Photo du Produit'}
                 </h4>
@@ -854,7 +854,7 @@ export const ProductsPage: React.FC = () => {
                     </div>
                   ) : (
                     <label className={`flex flex-col items-center justify-center w-20 h-20 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
-                      isDark ? 'border-slate-700 hover:border-blue-500 text-slate-500 hover:text-blue-400' : 'border-slate-300 hover:border-blue-500 text-slate-400 hover:text-blue-600'
+                      'border-slate-700 hover:border-blue-500 text-slate-500 hover:text-blue-400'
                     }`}>
                       <Camera className="w-6 h-6 mb-1" />
                       <span className="text-[9px] font-bold text-center">Ajouter</span>
@@ -869,11 +869,11 @@ export const ProductsPage: React.FC = () => {
 
               {/* Section 2: Barcodes */}
               <div className={`space-y-3 p-4 rounded-2xl border ${
-                isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                'bg-slate-950 border-slate-800'
               }`}>
                 <div className="flex items-center justify-between">
                   <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                    isDark ? 'text-slate-300' : 'text-slate-700'
+                    'text-slate-300'
                   }`}>
                     <Barcode className="w-3.5 h-3.5 text-blue-500" /> 2. {isAr ? 'الرموز الشريطية (حد أقصى 5)' : 'Codes-barres (Max 5)'}
                   </h4>
@@ -893,7 +893,7 @@ export const ProductsPage: React.FC = () => {
                     value={manualBarcode}
                     onChange={e => setManualBarcode(e.target.value)}
                     className={`flex-1 border rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none ${
-                      isDark ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                      'bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-500'
                     }`}
                   />
                   <button
@@ -911,7 +911,7 @@ export const ProductsPage: React.FC = () => {
                       <span
                         key={bc}
                         className={`inline-flex items-center gap-1.5 px-3 py-1 border rounded-lg font-mono text-xs font-bold ${
-                          isDark ? 'bg-slate-800 border-slate-700 text-blue-400' : 'bg-white border-slate-300 text-blue-600'
+                          'bg-slate-800 border-slate-700 text-blue-400'
                         }`}
                       >
                         <Barcode className="w-3.5 h-3.5" />
@@ -927,11 +927,11 @@ export const ProductsPage: React.FC = () => {
 
               {/* Section 3: Colors (Single selection, enabled for Casque/Carénage) */}
               <div className={`space-y-3 p-4 rounded-2xl border transition-all ${
-                isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                'bg-slate-950 border-slate-800'
               }`}>
                 <div className="flex items-center justify-between">
                   <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                    isDark ? 'text-slate-300' : 'text-slate-700'
+                    'text-slate-300'
                   }`}>
                     <Palette className="w-3.5 h-3.5 text-purple-500" /> 3. {isAr ? 'لون القطعة' : 'Couleur de la pièce'}
                   </h4>
@@ -960,7 +960,7 @@ export const ProductsPage: React.FC = () => {
                   {/* Inline Add Color Form */}
                   {showAddColorForm && isColorEligible && (
                     <div className={`p-3 rounded-xl border flex items-center gap-2 ${
-                      isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                      'bg-slate-900 border-slate-700'
                     }`}>
                       <input
                         type="text"
@@ -968,7 +968,7 @@ export const ProductsPage: React.FC = () => {
                         value={newColorName}
                         onChange={e => setNewColorName(e.target.value.toUpperCase())}
                         className={`flex-1 border rounded-lg px-2.5 py-1.5 text-xs font-bold outline-none uppercase ${
-                          isDark ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900'
+                          'bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-500'
                         }`}
                       />
                       <input
@@ -988,7 +988,7 @@ export const ProductsPage: React.FC = () => {
                   )}
 
                   <div>
-                    <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <label className={`text-[11px] font-bold ${'text-slate-300'}`}>
                       {isAr ? 'اختر لون القطعة :' : 'Sélectionner la couleur :'}
                     </label>
                     <select
@@ -996,7 +996,7 @@ export const ProductsPage: React.FC = () => {
                       value={selectedColorId}
                       onChange={e => setSelectedColorId(e.target.value ? parseInt(e.target.value, 10) : '')}
                       className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-bold outline-none ${
-                        isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                        'bg-slate-800 border-slate-700 text-slate-100'
                       }`}
                     >
                       <option value="">{isAr ? '-- بدون لون / موحد --' : '-- Sans couleur spécifique / Standard --'}</option>
@@ -1010,11 +1010,11 @@ export const ProductsPage: React.FC = () => {
 
               {/* Section 4: Motos & Scooters Compatibles */}
               <div className={`space-y-3 p-4 rounded-2xl border ${
-                isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                'bg-slate-950 border-slate-800'
               }`}>
                 <div className="flex items-center justify-between">
                   <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                    isDark ? 'text-slate-300' : 'text-slate-700'
+                    'text-slate-300'
                   }`}>
                     <Wrench className="w-3.5 h-3.5 text-blue-500" /> 4. {isAr ? 'الدراجات والموتوات المتوافقة' : 'Compatibilité Motos & Scooters'}
                   </h4>
@@ -1029,12 +1029,12 @@ export const ProductsPage: React.FC = () => {
                   value={motoSearchFilter}
                   onChange={e => setMotoSearchFilter(e.target.value.toUpperCase())}
                   className={`w-full border rounded-xl px-3 py-1.5 text-xs font-medium outline-none uppercase ${
-                    isDark ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                    'bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-500'
                   }`}
                 />
 
                 <div className={`max-h-40 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-1.5 p-2 rounded-xl border ${
-                  isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'
+                  'bg-slate-800 border-slate-700'
                 }`}>
                   {filteredMotos.map(m => {
                     const isChecked = compatibleMotos.includes(m.id);
@@ -1057,13 +1057,13 @@ export const ProductsPage: React.FC = () => {
 
               {/* Section 5: Initial Stock */}
               <div className={`space-y-3 p-4 rounded-2xl border ${
-                isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                'bg-slate-950 border-slate-800'
               }`}>
-                <h4 className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                <h4 className={`text-xs font-bold uppercase tracking-wider ${'text-slate-300'}`}>
                   5. {isAr ? 'المخزون الأولي' : 'Stock Initial'}
                 </h4>
                 <div className="max-w-xs">
-                  <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <label className={`text-[11px] font-bold ${'text-slate-300'}`}>
                     {isAr ? 'الكمية الأولية في المحل' : 'Quantité initiale en stock'}
                   </label>
                   <input
@@ -1072,7 +1072,7 @@ export const ProductsPage: React.FC = () => {
                     value={initialStockStore1}
                     onChange={e => setInitialStockStore1(e.target.value)}
                     className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-bold text-center text-emerald-500 outline-none ${
-                      isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'
+                      'bg-slate-800 border-slate-700'
                     }`}
                   />
                 </div>
@@ -1080,13 +1080,13 @@ export const ProductsPage: React.FC = () => {
 
               {/* Submit Buttons */}
               <div className={`flex items-center justify-end gap-3 pt-3 border-t ${
-                isDark ? 'border-slate-800' : 'border-slate-200'
+                'border-slate-800'
               }`}>
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
                   className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors ${
-                    isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                    'text-slate-400 hover:text-slate-100'
                   }`}
                 >
                   {isAr ? 'إلغاء' : 'Annuler'}
@@ -1107,27 +1107,27 @@ export const ProductsPage: React.FC = () => {
       {showProformaModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className={`border rounded-3xl max-w-2xl w-full p-6 space-y-5 shadow-2xl ${
-            isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-300 text-slate-900'
+            'bg-slate-900 border-slate-800 text-slate-100'
           }`}>
             <div className={`flex items-center justify-between border-b pb-3 ${
-              isDark ? 'border-slate-800' : 'border-slate-200'
+              'border-slate-800'
             }`}>
               <h3 className={`text-base font-black flex items-center gap-2 ${
-                isDark ? 'text-white' : 'text-slate-900'
+                'text-slate-100'
               }`}>
                 <FileText className="w-5 h-5 text-emerald-500" />
                 <span>{isAr ? 'إنشاء فاتورة شكلية (Devis Proforma)' : 'Générateur de Facture Proforma'}</span>
               </h3>
               <button 
                 onClick={() => setShowProformaModal(false)} 
-                className={`p-1 rounded-lg ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
+                className={`p-1 rounded-lg ${'text-slate-400 hover:text-slate-100'}`}
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div>
-              <label className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+              <label className={`text-[11px] font-bold ${'text-slate-300'}`}>
                 {isAr ? 'اسم العميل / المؤسسة' : 'Nom du Client / Entreprise'}
               </label>
               <input
@@ -1136,13 +1136,13 @@ export const ProductsPage: React.FC = () => {
                 onChange={e => setProformaClientName(e.target.value.toUpperCase())}
                 placeholder="Ex: SARL MOTO EXPRESS ALGER"
                 className={`w-full mt-1.5 border rounded-xl px-3.5 py-2.5 text-xs font-bold outline-none uppercase ${
-                  isDark ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                  'bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-500'
                 }`}
               />
             </div>
 
             <div className={`border rounded-2xl p-3 max-h-48 overflow-y-auto space-y-2 ${
-              isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+              'bg-slate-950 border-slate-800'
             }`}>
               <span className="text-[10px] uppercase font-bold text-slate-400 block">
                 {isAr ? 'اختر مقالات لإضافتها للتقدير :' : 'Ajouter des articles au Devis :'}
@@ -1161,7 +1161,7 @@ export const ProductsPage: React.FC = () => {
                       }
                     }}
                     className={`p-2 rounded-xl border text-left text-xs transition-all ${
-                      isDark ? 'bg-slate-800 border-slate-700 hover:bg-slate-750' : 'bg-white border-slate-300 hover:bg-slate-100'
+                      'bg-slate-800 border-slate-700 hover:bg-slate-750'
                     }`}
                   >
                     <div className="font-bold truncate">{p.name}</div>
@@ -1177,7 +1177,7 @@ export const ProductsPage: React.FC = () => {
                 <div className="space-y-1">
                   {proformaItems.map((item, idx) => (
                     <div key={idx} className={`p-2 rounded-xl border flex items-center justify-between text-xs ${
-                      isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+                      'bg-slate-800 border-slate-700'
                     }`}>
                       <span className="font-bold truncate max-w-[200px]">{item.product.name}</span>
                       <div className="flex items-center gap-3">
@@ -1197,13 +1197,13 @@ export const ProductsPage: React.FC = () => {
             )}
 
             <div className={`flex items-center justify-end gap-3 pt-3 border-t ${
-              isDark ? 'border-slate-800' : 'border-slate-200'
+              'border-slate-800'
             }`}>
               <button
                 type="button"
                 onClick={() => setShowProformaModal(false)}
                 className={`px-4 py-2 text-xs font-bold rounded-xl ${
-                  isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                  'text-slate-400 hover:text-slate-100'
                 }`}
               >
                 Annuler

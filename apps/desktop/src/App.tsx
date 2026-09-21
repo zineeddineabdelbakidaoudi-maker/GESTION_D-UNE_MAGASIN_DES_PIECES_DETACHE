@@ -3,7 +3,7 @@ import { useStore } from './store/useStore';
 import { LoginPage } from './pages/LoginPage';
 import { TrialBanner } from './components/TrialBanner';
 import { Header } from './components/Header';
-import { Sidebar } from './components/Sidebar';
+import { TabStrip } from './components/TabStrip';
 import { Toaster, AccessDenied, LoadingState } from './components/ui';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { POSPage } from './pages/POSPage';
@@ -154,23 +154,18 @@ export const App: React.FC = () => {
     <div className="h-screen w-screen flex flex-col overflow-hidden" style={{ backgroundColor: 'rgb(var(--gv-bg))', color: 'rgb(var(--gv-text))' }}>
       <TrialBanner />
 
-      <div className="flex-1 flex overflow-hidden">
-        <Sidebar />
+      <Header onChangePassword={() => setPasswordModal(true)} />
+      <TabStrip />
 
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <Header onChangePassword={() => setPasswordModal(true)} />
-
-          <main className="flex-1 overflow-hidden" style={{ backgroundColor: 'rgb(var(--gv-bg))' }}>
-            {!current ? (
-              <AccessDenied />
-            ) : allowed ? (
-              current.render()
-            ) : (
-              <AccessDenied module={MODULE_LABELS[current.module]} />
-            )}
-          </main>
-        </div>
-      </div>
+      <main className="flex-1 overflow-hidden min-h-0" style={{ backgroundColor: 'rgb(var(--gv-surface))' }}>
+        {!current ? (
+          <AccessDenied />
+        ) : allowed ? (
+          current.render()
+        ) : (
+          <AccessDenied module={MODULE_LABELS[current.module]} />
+        )}
+      </main>
 
       <ChangePasswordModal
         open={passwordModal || currentUser.mustChangePassword}

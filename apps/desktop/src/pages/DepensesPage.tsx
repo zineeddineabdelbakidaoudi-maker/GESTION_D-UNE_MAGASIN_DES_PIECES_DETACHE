@@ -150,27 +150,23 @@ export const DepensesPage: React.FC = () => {
 
   const totalFiltered = depenses.reduce((sum, d) => sum + d.amount, 0);
 
-  const base = isDark
-    ? 'bg-slate-950 text-white'
-    : 'bg-slate-50 text-slate-900';
-  const card = isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200';
-  const inputCls = isDark
-    ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500'
-    : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-blue-500';
+  const base = 'bg-slate-950 text-white';
+  const card = 'bg-slate-900 border-slate-800';
+  const inputCls = 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500';
 
   return (
     <div className={`flex flex-col h-full ${base}`}>
       {/* Header */}
-      <div className={`p-4 border-b ${isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'} flex items-center justify-between`}>
+      <div className={`p-4 border-b ${'border-slate-800 bg-slate-900'} flex items-center justify-between`}>
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-rose-600 flex items-center justify-center shadow-md shadow-rose-600/30">
-            <TrendingDown className="w-5 h-5 text-white" />
+            <TrendingDown className="w-5 h-5 text-slate-100" />
           </div>
           <div>
-            <h1 className={`font-bold text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <h1 className={`font-bold text-base ${'text-slate-100'}`}>
               {isAr ? 'المصاريف والنفقات' : 'Dépenses & Charges'}
             </h1>
-            <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <p className={`text-xs ${'text-slate-400'}`}>
               {currentStore?.name || (isAr ? 'كل المتاجر' : 'Tous les magasins')}
             </p>
           </div>
@@ -178,8 +174,8 @@ export const DepensesPage: React.FC = () => {
 
         <div className="flex items-center gap-3">
           {/* Monthly total badge */}
-          <div className={`px-4 py-2 rounded-xl border ${isDark ? 'bg-rose-950/50 border-rose-800/50' : 'bg-rose-50 border-rose-200'}`}>
-            <p className={`text-[10px] font-bold uppercase ${isDark ? 'text-rose-400' : 'text-rose-600'}`}>
+          <div className={`px-4 py-2 rounded-xl border ${'bg-rose-950/50 border-rose-800/50'}`}>
+            <p className={`text-[10px] font-bold uppercase ${'text-rose-400'}`}>
               {isAr ? 'إجمالي هذا الشهر' : 'Total ce mois'}
             </p>
             <p className="text-lg font-black text-rose-400">{formatDZD(totalMonth)}</p>
@@ -204,8 +200,8 @@ export const DepensesPage: React.FC = () => {
       )}
 
       {/* Filters */}
-      <div className={`px-4 py-3 border-b ${isDark ? 'border-slate-800' : 'border-slate-200'} flex items-center gap-3 flex-wrap`}>
-        <Filter className={`w-4 h-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+      <div className={`px-4 py-3 border-b ${'border-slate-800'} flex items-center gap-3 flex-wrap`}>
+        <Filter className={`w-4 h-4 ${'text-slate-400'}`} />
         <select
           value={filterCategory}
           onChange={e => setFilterCategory(e.target.value ? Number(e.target.value) : '')}
@@ -217,14 +213,14 @@ export const DepensesPage: React.FC = () => {
           ))}
         </select>
         <div className="flex items-center gap-2">
-          <CalendarDays className={`w-4 h-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+          <CalendarDays className={`w-4 h-4 ${'text-slate-400'}`} />
           <input
             type="date"
             value={filterDateFrom}
             onChange={e => setFilterDateFrom(e.target.value)}
             className={`rounded-lg border px-3 py-1.5 text-xs ${inputCls}`}
           />
-          <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>→</span>
+          <span className={'text-slate-400'}>→</span>
           <input
             type="date"
             value={filterDateTo}
@@ -255,8 +251,8 @@ export const DepensesPage: React.FC = () => {
           </div>
         ) : depenses.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 gap-3">
-            <Receipt className={`w-12 h-12 ${isDark ? 'text-slate-700' : 'text-slate-300'}`} />
-            <p className={`text-sm font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            <Receipt className={`w-12 h-12 ${'text-slate-700'}`} />
+            <p className={`text-sm font-medium ${'text-slate-500'}`}>
               {isAr ? 'لا توجد نفقات مسجلة' : 'Aucune dépense enregistrée'}
             </p>
           </div>
@@ -264,12 +260,12 @@ export const DepensesPage: React.FC = () => {
           <div className={`rounded-2xl border overflow-hidden ${card}`}>
             <table className="w-full text-xs">
               <thead>
-                <tr className={`border-b ${isDark ? 'border-slate-800 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
-                  <th className={`text-left px-4 py-3 font-bold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{isAr ? 'التاريخ' : 'Date'}</th>
-                  <th className={`text-left px-4 py-3 font-bold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{isAr ? 'الفئة' : 'Catégorie'}</th>
-                  <th className={`text-left px-4 py-3 font-bold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{isAr ? 'المبلغ' : 'Montant'}</th>
-                  <th className={`text-left px-4 py-3 font-bold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{isAr ? 'ملاحظة' : 'Note'}</th>
-                  <th className={`text-left px-4 py-3 font-bold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{isAr ? 'بواسطة' : 'Par'}</th>
+                <tr className={`border-b ${'border-slate-800 bg-slate-800/50'}`}>
+                  <th className={`text-left px-4 py-3 font-bold ${'text-slate-400'}`}>{isAr ? 'التاريخ' : 'Date'}</th>
+                  <th className={`text-left px-4 py-3 font-bold ${'text-slate-400'}`}>{isAr ? 'الفئة' : 'Catégorie'}</th>
+                  <th className={`text-left px-4 py-3 font-bold ${'text-slate-400'}`}>{isAr ? 'المبلغ' : 'Montant'}</th>
+                  <th className={`text-left px-4 py-3 font-bold ${'text-slate-400'}`}>{isAr ? 'ملاحظة' : 'Note'}</th>
+                  <th className={`text-left px-4 py-3 font-bold ${'text-slate-400'}`}>{isAr ? 'بواسطة' : 'Par'}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -278,12 +274,10 @@ export const DepensesPage: React.FC = () => {
                   <tr
                     key={d.id}
                     className={`border-b transition-colors ${
-                      isDark
-                        ? 'border-slate-800/50 hover:bg-slate-800/30'
-                        : 'border-slate-100 hover:bg-slate-50'
+                      'border-slate-800/50 hover:bg-slate-800/30'
                     }`}
                   >
-                    <td className={`px-4 py-3 font-mono font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <td className={`px-4 py-3 font-mono font-bold ${'text-slate-300'}`}>
                       {formatDate(d.depenseDate)}
                     </td>
                     <td className="px-4 py-3">
@@ -295,10 +289,10 @@ export const DepensesPage: React.FC = () => {
                     <td className="px-4 py-3">
                       <span className="font-black text-rose-400 text-sm">{formatDZD(d.amount)}</span>
                     </td>
-                    <td className={`px-4 py-3 max-w-[200px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <td className={`px-4 py-3 max-w-[200px] truncate ${'text-slate-400'}`}>
                       {d.note || '—'}
                     </td>
-                    <td className={`px-4 py-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{d.userName}</td>
+                    <td className={`px-4 py-3 ${'text-slate-400'}`}>{d.userName}</td>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => handleDelete(d.id)}
@@ -319,15 +313,15 @@ export const DepensesPage: React.FC = () => {
       {/* Add Depense Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className={`w-full max-w-md rounded-2xl border shadow-2xl ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <div className={`flex items-center justify-between p-5 border-b ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+          <div className={`w-full max-w-md rounded-2xl border shadow-2xl ${'bg-slate-900 border-slate-700'}`}>
+            <div className={`flex items-center justify-between p-5 border-b ${'border-slate-800'}`}>
               <div className="flex items-center gap-2">
                 <TrendingDown className="w-5 h-5 text-rose-400" />
-                <h2 className={`font-bold text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <h2 className={`font-bold text-base ${'text-slate-100'}`}>
                   {isAr ? 'تسجيل نفقة جديدة' : 'Enregistrer une Dépense'}
                 </h2>
               </div>
-              <button onClick={() => setShowAddModal(false)} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+              <button onClick={() => setShowAddModal(false)} className="p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -340,7 +334,7 @@ export const DepensesPage: React.FC = () => {
               )}
 
               <div>
-                <label className={`block text-xs font-bold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                <label className={`block text-xs font-bold mb-1.5 ${'text-slate-300'}`}>
                   {isAr ? 'نوع النفقة *' : 'Type de Dépense *'}
                 </label>
                 <select
@@ -356,7 +350,7 @@ export const DepensesPage: React.FC = () => {
               </div>
 
               <div>
-                <label className={`block text-xs font-bold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                <label className={`block text-xs font-bold mb-1.5 ${'text-slate-300'}`}>
                   {isAr ? 'المبلغ (DA) *' : 'Montant (DA) *'}
                 </label>
                 <input
@@ -371,7 +365,7 @@ export const DepensesPage: React.FC = () => {
               </div>
 
               <div>
-                <label className={`block text-xs font-bold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                <label className={`block text-xs font-bold mb-1.5 ${'text-slate-300'}`}>
                   {isAr ? 'التاريخ' : 'Date'}
                 </label>
                 <input
@@ -383,7 +377,7 @@ export const DepensesPage: React.FC = () => {
               </div>
 
               <div>
-                <label className={`block text-xs font-bold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                <label className={`block text-xs font-bold mb-1.5 ${'text-slate-300'}`}>
                   {isAr ? 'ملاحظة (اختياري)' : 'Note (optionnel)'}
                 </label>
                 <textarea
@@ -396,11 +390,11 @@ export const DepensesPage: React.FC = () => {
               </div>
             </div>
 
-            <div className={`flex gap-3 p-5 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+            <div className={`flex gap-3 p-5 border-t ${'border-slate-800'}`}>
               <button
                 onClick={() => setShowAddModal(false)}
                 className={`flex-1 py-2.5 rounded-xl font-bold text-sm border transition-colors ${
-                  isDark ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                  'border-slate-700 text-slate-300 hover:bg-slate-800'
                 }`}
               >
                 {isAr ? 'إلغاء' : 'Annuler'}
