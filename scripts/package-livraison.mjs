@@ -17,7 +17,10 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DESKTOP = path.join(ROOT, 'apps/desktop');
-const RELEASE = path.join(DESKTOP, 'release');
+// electron-builder ne peut pas réécrire un exécutable en cours d'exécution.
+// `--release-dir` permet donc de construire ailleurs quand une caisse tourne.
+const releaseArg = process.argv.find(a => a.startsWith('--release-dir='));
+const RELEASE = path.join(DESKTOP, releaseArg ? releaseArg.split('=')[1] : 'release');
 const DOCS = path.join(ROOT, 'docs');
 
 const pkg = JSON.parse(fs.readFileSync(path.join(DESKTOP, 'package.json'), 'utf8'));

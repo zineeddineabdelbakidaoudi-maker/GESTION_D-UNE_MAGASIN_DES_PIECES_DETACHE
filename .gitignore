@@ -20,3 +20,6 @@ coverage
 
 # Dossier de livraison client (genere par scripts/package-livraison.mjs)
 livraison
+
+# Sortie de build alternative (utilisee quand release/ est verrouille)
+apps/desktop/release2

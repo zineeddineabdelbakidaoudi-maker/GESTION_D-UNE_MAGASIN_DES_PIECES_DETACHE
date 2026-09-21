@@ -381,7 +381,7 @@ export const SettingsPage: React.FC = () => {
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               activeTab === 'general'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-400 hover:text-slate-100'
             }`}
           >
             <Building2 className="w-3.5 h-3.5" />
@@ -392,7 +392,7 @@ export const SettingsPage: React.FC = () => {
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               activeTab === 'catalog'
                 ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-400 hover:text-slate-100'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
@@ -403,7 +403,7 @@ export const SettingsPage: React.FC = () => {
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               activeTab === 'shortcuts'
                 ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-400 hover:text-slate-100'
             }`}
           >
             <Keyboard className="w-3.5 h-3.5" />

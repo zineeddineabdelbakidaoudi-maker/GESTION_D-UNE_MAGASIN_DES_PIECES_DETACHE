@@ -415,7 +415,7 @@ export const POSPage: React.FC = () => {
             <button
               onClick={() => setViewMode('cards')}
               className={`p-1.5 rounded-lg transition-colors ${
-                viewMode === 'cards' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                viewMode === 'cards' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-100'
               }`}
               title="Vue Cartes"
             >
@@ -424,7 +424,7 @@ export const POSPage: React.FC = () => {
             <button
               onClick={() => setViewMode('list')}
               className={`p-1.5 rounded-lg transition-colors ${
-                viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-100'
               }`}
               title="Vue Liste"
             >

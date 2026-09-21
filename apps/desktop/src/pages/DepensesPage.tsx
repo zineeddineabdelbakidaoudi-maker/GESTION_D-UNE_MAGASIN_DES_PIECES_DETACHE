@@ -225,9 +225,9 @@ export const DepensesPage: React.FC = () => {
 
   const totalFiltered = depenses.reduce((sum, d) => sum + d.amount, 0);
 
-  const base = 'bg-slate-950 text-white';
+  const base = 'bg-slate-950 text-slate-100';
   const card = 'bg-slate-900 border-slate-800';
-  const inputCls = 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500';
+  const inputCls = 'bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-500 focus:border-blue-500';
 
   return (
     <div className={`flex flex-col h-full ${base}`}>
