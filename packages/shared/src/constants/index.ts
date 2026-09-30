@@ -90,4 +90,5 @@ export type SaleStatus = typeof SALE_STATUSES[number];
 export const MAX_BARCODES_PER_PRODUCT = 5;
 
 // Trial Duration
-export const TRIAL_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+export const TRIAL_DURATION_DAYS = 7;
+export const TRIAL_DURATION_MS = TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000;

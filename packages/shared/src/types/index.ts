@@ -373,5 +373,7 @@ export interface TrialState {
   remainingMs: number;
   remainingHours: number;
   remainingMinutes: number;
+  /** Jours entiers restants, pour un essai qui se compte en jours. */
+  remainingDays: number;
   message: string;
 }
