@@ -1,0 +1,300 @@
+/* ============================================================
+ Habillage « classique »
+ Reprend l'aspect des applications de gestion Windows (WinDev,
+ WinForms) : gris de boîte de dialogue, champs creusés, boutons
+ en relief, angles droits, libellé à gauche du champ.
+
+ Chargé après index.css : `.skin-classique` redéfinit les mêmes
+ variables que `:root` et l'emporte donc à spécificité égale.
+ ============================================================ */
+
+.skin-classique {
+--gv-bg: 198 208 226;          /* fond de la fenêtre, bleu-gris */
+--gv-surface: 240 240 240;     /* face des boîtes de dialogue */
+--gv-surface-2: 226 230 238;   /* bandeaux, en-têtes de tableau */
+--gv-border: 154 160 172;
+--gv-border-strong: 112 118 130;
+--gv-text: 0 0 0;
+--gv-text-muted: 58 62 72;
+--gv-accent: 0 51 153;         /* bleu de sélection Windows */
+--gv-radius: 0;
+--gv-shadow: none;
+--gv-shadow-lg: 0 2px 10px rgb(0 0 0 / 0.35);
+
+/* L'échelle « slate » repasse en valeurs de boîte de dialogue. */
+--s-950: 198 208 226;
+--s-900: 240 240 240;
+--s-800: 226 230 238;
+--s-700: 168 174 186;
+--s-600: 140 146 158;
+--s-500: 110 116 128;
+--s-400: 62 66 76;
+--s-300: 32 34 40;
+--s-200: 18 20 24;
+--s-100: 0 0 0;
+--s-50: 0 0 0;
+}
+
+.skin-classique body,
+.skin-classique {
+  font-family: Tahoma, "Segoe UI", Verdana, Arial, sans-serif;
+}
+
+/* Angles droits et pas d'ombres : c'est ce qui fait « application métier ». */
+.skin-classique [class*="rounded"] {
+  border-radius: 2px !important;
+}
+.skin-classique [class*="shadow"] {
+  box-shadow: none !important;
+}
+
+.skin-classique .gv-card,
+.skin-classique .gv-card-flat {
+  border-radius: 2px;
+  box-shadow: none;
+  border: 1px solid rgb(var(--gv-border));
+  background-color: rgb(var(--gv-surface));
+}
+
+/* Champ creusé : bordure sombre en haut et à gauche. */
+.skin-classique .gv-input,
+.skin-classique input[type="text"],
+.skin-classique input[type="number"],
+.skin-classique input[type="password"],
+.skin-classique input[type="date"],
+.skin-classique select,
+.skin-classique textarea {
+  border-radius: 2px;
+  background-color: #ffffff;
+  border: 1px solid #8a8f9a;
+  border-top-color: #6f757f;
+  border-left-color: #6f757f;
+  color: #000000;
+  padding: 0.16rem 0.35rem;
+  font-size: 12px;
+  box-shadow: none;
+}
+.skin-classique .gv-input:focus,
+.skin-classique input:focus,
+.skin-classique select:focus,
+.skin-classique textarea:focus {
+  border-color: rgb(var(--gv-accent));
+  box-shadow: 0 0 0 1px rgb(var(--gv-accent) / 0.35);
+}
+
+/* Bouton en relief. */
+.skin-classique .gv-btn,
+.skin-classique .gv-btn-primary,
+.skin-classique .gv-btn-ghost,
+.skin-classique .gv-btn-danger,
+.skin-classique .gv-btn-success {
+  border-radius: 2px;
+  border: 1px solid #7d828d;
+  background-image: linear-gradient(#fdfdfd, #e2e4e9);
+  color: #000000;
+  font-weight: 700;
+  padding: 0.3rem 0.7rem;
+  box-shadow: inset 0 1px 0 #ffffff;
+}
+.skin-classique .gv-btn-primary {
+  background-image: linear-gradient(#e8f0ff, #c9daf6);
+  border-color: #5a78ad;
+}
+.skin-classique .gv-btn-danger {
+  background-image: linear-gradient(#ffecec, #f6cdcd);
+  border-color: #ad5a5a;
+}
+.skin-classique .gv-btn:hover:not(:disabled) {
+  background-image: linear-gradient(#ffffff, #eef1f6);
+  border-color: rgb(var(--gv-accent));
+  filter: none;
+}
+.skin-classique .gv-btn:active:not(:disabled) {
+  background-image: linear-gradient(#d8dce4, #eceef2);
+  transform: none;
+}
+
+/* Tableaux : en-tête en relief, quadrillage net. */
+.skin-classique .gv-table thead th {
+  background-image: linear-gradient(#f6f7f9, #dfe3ea);
+  color: #000000;
+  border-bottom: 1px solid #9aa0ac;
+  border-right: 1px solid #c3c8d2;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11.5px;
+}
+.skin-classique .gv-table tbody td {
+  border-bottom: 1px solid #d3d7de;
+  font-size: 11.5px;
+}
+.skin-classique .gv-table tbody tr:hover {
+  background-color: #d8e4f8;
+}
+
+/* Onglets principaux : languettes solidaires du contenu. */
+.skin-classique .gv-tabstrip {
+  background-image: linear-gradient(#e9ecf2, #d8dde7);
+  border-bottom: 1px solid #9aa0ac;
+  padding: 0.25rem 0.4rem 0;
+}
+.skin-classique .gv-tab {
+  border-radius: 3px 3px 0 0;
+  border: 1px solid #9aa0ac;
+  background-image: linear-gradient(#f4f6f9, #e2e6ee);
+  color: #000000;
+  font-weight: 600;
+  padding: 0.28rem 0.8rem;
+}
+.skin-classique .gv-tab-active {
+  background-image: linear-gradient(#ffffff, #f4f6fa);
+  border-bottom-color: #ffffff;
+  color: rgb(var(--gv-accent));
+  font-weight: 800;
+}
+.skin-classique .gv-tab-active::before {
+  background-color: rgb(var(--gv-accent));
+}
+
+.skin-classique .gv-badge {
+  border-radius: 2px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ── Éléments propres aux écrans « classiques » ───────────── */
+
+/* Groupe encadré, titre chevauchant la bordure. */
+.cl-group {
+  position: relative;
+  border: 1px solid #9aa0ac;
+  background-color: #f4f6fa;
+  padding: 0.85rem 0.7rem 0.6rem;
+  margin-top: 0.55rem;
+}
+.cl-group > legend {
+  position: absolute;
+  top: -0.62rem;
+  left: 0.6rem;
+  padding: 0 0.35rem;
+  background-color: #f4f6fa;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #1a3a6b;
+}
+
+/* Ligne de formulaire : libellé à gauche, champ en face. */
+.cl-row {
+  display: grid;
+  grid-template-columns: 9.5rem 1fr;
+  align-items: center;
+  column-gap: 0.5rem;
+  margin-bottom: 0.28rem;
+  min-height: 1.55rem;
+}
+.cl-label {
+  text-align: right;
+  font-size: 12px;
+  color: #14223c;
+  white-space: nowrap;
+}
+.cl-field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.cl-hint {
+  font-size: 11px;
+  color: #5a6070;
+  font-style: italic;
+  white-space: nowrap;
+}
+
+/* Bouton de la barre d'icônes : grande icône, libellé dessous. */
+.cl-toolbtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.18rem;
+  width: 5.3rem;
+  padding: 0.3rem 0.1rem 0.25rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #14223c;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  cursor: pointer;
+}
+.cl-toolbtn:hover:not(:disabled) {
+  border-color: #7f9dd0;
+  background-image: linear-gradient(#f2f7ff, #d9e6fb);
+}
+.cl-toolbtn:active:not(:disabled) {
+  background-image: linear-gradient(#cfdcf3, #e6eefb);
+}
+.cl-toolbtn:disabled {
+  color: #8a8f99;
+  cursor: not-allowed;
+}
+.cl-toolicon {
+  width: 2.35rem;
+  height: 2.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #8f96a4;
+  border-radius: 3px;
+  background-image: linear-gradient(#ffffff, #dfe5ef);
+}
+
+/* Barre de titre de fenêtre. */
+.cl-titlebar {
+  background-image: linear-gradient(#1d4f91, #2f6fc0);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 0.22rem 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Sous-onglets (Maj Produit, Code-Barres, …). */
+.cl-subtab {
+  border: 1px solid #9aa0ac;
+  border-bottom: none;
+  background-image: linear-gradient(#f2f4f8, #dde2ea);
+  padding: 0.2rem 0.65rem;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #14223c;
+  margin-right: 2px;
+  border-radius: 3px 3px 0 0;
+  cursor: pointer;
+}
+.cl-subtab-active {
+  background-image: linear-gradient(#ffffff, #f6f8fc);
+  color: #0b2d6b;
+  font-weight: 800;
+  position: relative;
+  top: 1px;
+}
+
+/* Ligne de statistique du panneau de droite. */
+.cl-stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.13rem 0;
+  font-size: 11.5px;
+  color: #14223c;
+}
+.cl-stat-value {
+  font-family: Consolas, "Courier New", monospace;
+  font-weight: 700;
+  color: #8a1a1a;
+  white-space: nowrap;
+}

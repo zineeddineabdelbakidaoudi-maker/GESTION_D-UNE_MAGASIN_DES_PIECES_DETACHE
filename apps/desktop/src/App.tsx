@@ -18,13 +18,25 @@ import { SettingsPage } from './pages/SettingsPage';
 import { DepensesPage } from './pages/DepensesPage';
 import { JournalPage } from './pages/JournalPage';
 import { UsersPage } from './pages/UsersPage';
+import { ProduitClassique } from './pages/classique/ProduitClassique';
 import { invokeIpcSafe, onSessionExpired } from './api/electronBridge';
 import { MODULE_LABELS, type SystemModule } from '@gestion-veloo/shared';
+
+/**
+ * L'onglet Produits rend l'écran correspondant à l'habillage choisi :
+ * la fiche classique (barre d'icônes, sous-onglets, libellés à gauche) ou
+ * le catalogue moderne.
+ */
+const EcranProduits: React.FC = () => {
+  const skin = useStore(s => s.uiSkin);
+  return skin === 'classique' ? <ProduitClassique /> : <ProductsPage />;
+};
 
 /** Chaque onglet déclare le module qui conditionne son accès. */
 const TAB_REGISTRY: Array<{ id: string; module: SystemModule; render: () => JSX.Element }> = [
   { id: 'pos', module: 'pos', render: () => <POSPage /> },
-  { id: 'produits', module: 'produits', render: () => <ProductsPage /> },
+  { id: 'produits', module: 'produits', render: () => <EcranProduits /> },
+  { id: 'produits-liste', module: 'produits', render: () => <ProductsPage /> },
   { id: 'stock', module: 'stock', render: () => <StockPage /> },
   { id: 'achat', module: 'achat', render: () => <PurchasesPage /> },
   { id: 'clients', module: 'clients', render: () => <ClientsPage /> },
@@ -53,7 +65,7 @@ const SHORTCUT_TO_TAB: Record<string, string> = {
 
 export const App: React.FC = () => {
   const {
-    currentUser, activeTab, setActiveTab, theme, lang,
+    currentUser, activeTab, setActiveTab, theme, lang, uiSkin,
     sessionChecked, restoreSession, signOut, hasPermission, pushToast
   } = useStore();
 
@@ -63,10 +75,14 @@ export const App: React.FC = () => {
   const shortcutsRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDark);
-    document.documentElement.lang = isAr ? 'ar' : 'fr';
-    document.documentElement.dir = isAr ? 'rtl' : 'ltr';
-  }, [isDark, isAr]);
+    const racine = document.documentElement;
+    // L'habillage classique reprend les gris des boîtes de dialogue Windows :
+    // il est clair par nature, le mode sombre ne s'y applique pas.
+    racine.classList.toggle('skin-classique', uiSkin === 'classique');
+    racine.classList.toggle('dark', isDark && uiSkin !== 'classique');
+    racine.lang = isAr ? 'ar' : 'fr';
+    racine.dir = isAr ? 'rtl' : 'ltr';
+  }, [isDark, isAr, uiSkin]);
 
   // Une session peut survivre à un rechargement de la fenêtre : on la récupère.
   useEffect(() => {

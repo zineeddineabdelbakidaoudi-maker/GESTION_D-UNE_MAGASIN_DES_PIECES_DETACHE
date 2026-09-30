@@ -26,6 +26,15 @@ export interface Capabilities {
   canSeeCost: boolean;
 }
 
+/**
+ * Habillage de l'interface.
+ *  - `moderne`   : la présentation actuelle, sombre ou claire.
+ *  - `classique` : l'aspect des applications de gestion Windows (WinDev,
+ *                  WinForms) — barre d'icônes, onglets, champs encadrés,
+ *                  libellé à gauche du champ. Toujours en clair.
+ */
+export type UiSkin = 'moderne' | 'classique';
+
 export interface CartItem {
   product: Product;
   productColorId?: number | null;
@@ -58,6 +67,7 @@ interface AppState {
   capital: number;
   lang: 'fr' | 'ar';
   theme: 'dark' | 'light';
+  uiSkin: UiSkin;
   toasts: Toast[];
 
   restoreSession: () => Promise<void>;
@@ -71,6 +81,7 @@ interface AppState {
   setLang: (lang: 'fr' | 'ar') => void;
   setTheme: (theme: 'dark' | 'light') => void;
   toggleTheme: () => void;
+  setUiSkin: (skin: UiSkin) => void;
 
   pushToast: (toast: Omit<Toast, 'id'>) => void;
   dismissToast: (id: number) => void;
@@ -122,6 +133,7 @@ export const useStore = create<AppState>((set, get) => ({
   capital: 0,
   lang: (localStorage.getItem('pos_lang') as 'fr' | 'ar') || 'fr',
   theme: (localStorage.getItem('pos_theme') as 'dark' | 'light') || 'dark',
+  uiSkin: (localStorage.getItem('pos_skin') as UiSkin) || 'moderne',
   toasts: [],
 
   applySession: (payload) => {
@@ -188,6 +200,11 @@ export const useStore = create<AppState>((set, get) => ({
     const next = get().theme === 'dark' ? 'light' : 'dark';
     localStorage.setItem('pos_theme', next);
     set({ theme: next });
+  },
+
+  setUiSkin: (skin) => {
+    localStorage.setItem('pos_skin', skin);
+    set({ uiSkin: skin });
   },
 
   pushToast: (toast) => {

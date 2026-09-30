@@ -60,7 +60,7 @@ const SHORTCUT_LABELS: Record<string, { fr: string; ar: string }> = {
 };
 
 export const SettingsPage: React.FC = () => {
-  const { currentStore, hasPermission, lang, theme } = useStore();
+  const { currentStore, hasPermission, lang, theme, uiSkin, setUiSkin } = useStore();
   const isAr = lang === 'ar';
   const isDark = theme === 'dark';
 
@@ -633,6 +633,57 @@ export const SettingsPage: React.FC = () => {
                   }`}
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Section: Apparence de l'application */}
+          <div className={`space-y-3 p-4 rounded-2xl border ${'bg-slate-950 border-slate-800'}`}>
+            <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${'text-slate-300'}`}>
+              <Sliders className="w-3.5 h-3.5 text-blue-500" />
+              {isAr ? 'مظهر التطبيق' : "Apparence de l'application"}
+            </h4>
+            <p className={`text-[11px] ${'text-slate-400'}`}>
+              {isAr
+                ? 'اختر شكل الواجهة. يُحفظ الاختيار على هذا الجهاز.'
+                : "Choisissez l'aspect de l'interface. Le choix est enregistré sur ce poste."}
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {([
+                {
+                  id: 'moderne' as const,
+                  titre: isAr ? 'حديث' : 'Moderne',
+                  desc: isAr
+                    ? 'واجهة حديثة، وضع داكن أو فاتح.'
+                    : 'Présentation actuelle : onglets en haut, mode sombre ou clair, grands boutons.'
+                },
+                {
+                  id: 'classique' as const,
+                  titre: isAr ? 'كلاسيكي' : 'Classique (gestion Windows)',
+                  desc: isAr
+                    ? 'مثل برامج التسيير القديمة : أزرار كبيرة في الأعلى وحقول بجانب تسمياتها.'
+                    : "Comme les logiciels de gestion Windows : barre d'icônes à accès rapide, sous-onglets, libellé à gauche du champ. Toujours en clair."
+                }
+              ]).map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setUiSkin(opt.id)}
+                  className={`text-start p-3 rounded-xl border transition-all ${
+                    uiSkin === opt.id
+                      ? 'border-blue-500 bg-blue-500/10'
+                      : 'border-slate-700 bg-slate-800 hover:border-slate-600'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`w-3.5 h-3.5 rounded-full border-2 ${
+                      uiSkin === opt.id ? 'border-blue-500 bg-blue-500' : 'border-slate-500'
+                    }`} />
+                    <span className="text-xs font-black text-slate-100">{opt.titre}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1.5 leading-snug">{opt.desc}</p>
+                </button>
+              ))}
             </div>
           </div>
 
