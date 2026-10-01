@@ -8,6 +8,7 @@ export * from './utils/trial';
 export * from './validations';
 export * from './i18n';
 export * from './domain/costing';
+export * from './domain/pricing';
 export * from './domain/rbac';
 export * from './domain/audit';
 

@@ -106,6 +106,9 @@ function initLocalSchema(db: Database.Database) {
       price_semi_gros INTEGER NOT NULL DEFAULT 0,
       price_gros INTEGER NOT NULL DEFAULT 0,
       color_mode TEXT NOT NULL DEFAULT 'single',
+      -- 1 quand les quantites sont saisies couleur par couleur : le total de
+      -- l'article devient la somme des couleurs et n'est plus saisi a la main.
+      color_stock_tracked INTEGER NOT NULL DEFAULT 0,
       unit TEXT NOT NULL DEFAULT 'PCS',
       location TEXT NOT NULL DEFAULT '',
       photo_base64 TEXT DEFAULT NULL,
@@ -133,6 +136,17 @@ function initLocalSchema(db: Database.Database) {
       product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
       motorcycle_model_id INTEGER NOT NULL REFERENCES motorcycle_models(id) ON DELETE CASCADE,
       PRIMARY KEY (product_id, motorcycle_model_id)
+    );
+
+    -- Stock detaille par couleur, pour les articles declines en variantes.
+    -- Le total de product_stock reste la somme de ces lignes : c'est lui que
+    -- lisent la caisse et les rapports, aucune requete existante ne change.
+    CREATE TABLE IF NOT EXISTS product_color_stock (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_color_id INTEGER NOT NULL REFERENCES product_colors(id) ON DELETE CASCADE,
+      store_id INTEGER NOT NULL REFERENCES stores(id),
+      quantity INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(product_color_id, store_id)
     );
 
     CREATE TABLE IF NOT EXISTS product_stock (
@@ -295,6 +309,7 @@ function initLocalSchema(db: Database.Database) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       purchase_id INTEGER NOT NULL REFERENCES purchases(id) ON DELETE CASCADE,
       product_id INTEGER NOT NULL REFERENCES products(id),
+      product_color_id INTEGER REFERENCES product_colors(id),
       qty INTEGER NOT NULL,
       unit_cost INTEGER NOT NULL,
       line_total INTEGER NOT NULL,
@@ -494,6 +509,12 @@ function runMigrations(db: Database.Database) {
   addColumn('client_transactions', 'user_id', 'INTEGER');
   addColumn('supplier_transactions', 'user_id', 'INTEGER');
   addColumn('audit_log', 'synced_at', 'TEXT');
+  // Les articles existants gardent leur comptage global : la reprise
+  // n'invente aucune repartition par couleur.
+  addColumn('products', 'color_stock_tracked', 'INTEGER NOT NULL DEFAULT 0');
+  // Une reception doit dire dans quelle couleur elle entre, sinon le detail
+  // par couleur cesserait d'egaler le total de l'article.
+  addColumn('purchase_items', 'product_color_id', 'INTEGER');
   addColumn('sync_queue', 'last_error', 'TEXT');
 
   // Reprise de l'historique : coût de revient manquant sur les anciennes lignes de vente.
@@ -553,7 +574,7 @@ function runMigrations(db: Database.Database) {
     `);
   } catch {}
 
-  db.pragma('user_version = 3');
+  db.pragma('user_version = 4');
 }
 
 function seedLocalData(db: Database.Database) {

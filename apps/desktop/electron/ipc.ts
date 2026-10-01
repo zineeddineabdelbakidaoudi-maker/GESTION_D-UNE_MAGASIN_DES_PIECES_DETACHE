@@ -11,6 +11,8 @@ import {
   formatProductCode,
   generateBarcodeValue,
   resolvePurchaseCost,
+  findPriceFloorViolations,
+  checkDiscount,
   diffRecords,
   can,
   type SystemModule,
@@ -257,8 +259,14 @@ export function registerIpcHandlers() {
     const rows = ctx.db.prepare(sql).all(...args) as any[];
 
     const barcodeStmt = ctx.db.prepare('SELECT id, barcode_value as barcodeValue, source FROM product_barcodes WHERE product_id = ?');
+    // Le stock de chaque couleur accompagne la couleur : la caisse doit pouvoir
+    // dire « il reste 3 rouges » sans deuxieme aller-retour.
     const colorStmt = ctx.db.prepare(`
-      SELECT pc.id, pc.color_id as colorId, pc.merge_group_id as mergeGroupId, c.name, c.hex_code as hexCode
+      SELECT pc.id, pc.color_id as colorId, pc.merge_group_id as mergeGroupId, c.name, c.hex_code as hexCode,
+             COALESCE((
+               SELECT SUM(pcs.quantity) FROM product_color_stock pcs
+               WHERE pcs.product_color_id = pc.id AND (? IS NULL OR pcs.store_id = ?)
+             ), 0) as stock
       FROM product_colors pc JOIN colors c ON pc.color_id = c.id WHERE pc.product_id = ?
     `);
     const compatStmt = ctx.db.prepare(`
@@ -285,7 +293,8 @@ export function registerIpcHandlers() {
         minStock: p.min_stock ?? 0,
         isArchived: Boolean(p.is_archived),
         barcodes: barcodeStmt.all(p.id),
-        colors: colorStmt.all(p.id),
+        colors: colorStmt.all(storeId || null, storeId || null, p.id),
+        colorStockTracked: Boolean(p.color_stock_tracked),
         compatibleModels: compatStmt.all(p.id),
         stock,
         totalStock
@@ -335,8 +344,14 @@ export function registerIpcHandlers() {
       const insertBarcode = ctx.db.prepare('INSERT OR IGNORE INTO product_barcodes (product_id, barcode_value, source) VALUES (?, ?, ?)');
       for (const bc of barcodes.slice(0, 5)) insertBarcode.run(nextId, bc, payload?.barcodes?.length ? 'manual' : 'auto');
 
-      applyProductColors(ctx.db, nextId, payload);
+      const couleurs = applyProductColors(ctx.db, nextId, payload);
       applyProductCompat(ctx.db, nextId, payload?.compatibleModelIds);
+
+      // Article decline en couleurs : le total de chaque boutique est la somme
+      // des quantites saisies couleur par couleur, jamais une saisie manuelle.
+      if (couleurs.tracked) {
+        ctx.db.prepare('UPDATE products SET color_stock_tracked = 1 WHERE id = ?').run(nextId);
+      }
 
       const stores = ctx.db.prepare('SELECT id FROM stores').all() as any[];
       const insertStock = ctx.db.prepare('INSERT INTO product_stock (product_id, store_id, quantity) VALUES (?, ?, ?)');
@@ -347,7 +362,9 @@ export function registerIpcHandlers() {
 
       let seeded = 0;
       for (const s of stores) {
-        const qty = int(payload?.initialStock?.[String(s.id)]);
+        const qty = couleurs.tracked
+          ? (couleurs.parBoutique.get(Number(s.id)) || 0)
+          : int(payload?.initialStock?.[String(s.id)]);
         insertStock.run(nextId, s.id, qty);
         if (qty > 0) {
           insertMovement.run(nextId, s.id, STOCK_MOVEMENT_CODES.ACHAT, qty, qty, priceAchat, ctx.session.userId);
@@ -409,8 +426,36 @@ export function registerIpcHandlers() {
         id
       );
 
-      applyProductColors(ctx.db, id, payload);
+      const couleurs = applyProductColors(ctx.db, id, payload);
       if (payload?.compatibleModelIds !== undefined) applyProductCompat(ctx.db, id, payload.compatibleModelIds);
+
+      // Quand les quantites sont saisies couleur par couleur, le total de
+      // chaque boutique en decoule. Chaque ecart est trace comme un mouvement
+      // de stock : le journal doit expliquer tout changement de quantite.
+      if (couleurs.tracked) {
+        ctx.db.prepare('UPDATE products SET color_stock_tracked = 1 WHERE id = ?').run(id);
+        const mouvement = ctx.db.prepare(`
+          INSERT INTO stock_movements (product_id, store_id, movement_code, qty_before, qty_after, delta, unit_cost, note, user_id, ref_type, ref_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'Total recalcule depuis les quantites par couleur', ?, 'product', ?)
+        `);
+        for (const [storeId, total] of couleurs.parBoutique) {
+          const avant = ctx.db.prepare('SELECT quantity FROM product_stock WHERE product_id = ? AND store_id = ?')
+            .get(id, storeId) as any;
+          const qtyAvant = avant ? avant.quantity : 0;
+          if (qtyAvant === total) continue;
+          ctx.db.prepare(`
+            INSERT INTO product_stock (product_id, store_id, quantity) VALUES (?, ?, ?)
+            ON CONFLICT(product_id, store_id) DO UPDATE SET quantity = excluded.quantity
+          `).run(id, storeId, total);
+          mouvement.run(
+            id, storeId, STOCK_MOVEMENT_CODES.AJUSTEMENT, qtyAvant, total, total - qtyAvant,
+            priceAchat, ctx.session.userId, id
+          );
+        }
+      } else if (payload?.colorMode && payload.colorMode !== 'variants') {
+        // L'article repasse en couleur unique : il retrouve un comptage global.
+        ctx.db.prepare('UPDATE products SET color_stock_tracked = 0 WHERE id = ?').run(id);
+      }
 
       if (payload?.barcodes?.length) {
         ctx.db.prepare('DELETE FROM product_barcodes WHERE product_id = ?').run(id);
@@ -553,6 +598,7 @@ export function registerIpcHandlers() {
     if (!note) throw new Error('Un motif est obligatoire pour tout ajustement de stock.');
 
     return ctx.db.transaction(() => {
+      refuserSiSuiviParCouleur(ctx.db, productId, 'corrigez les quantites');
       const current = ctx.db.prepare('SELECT quantity FROM product_stock WHERE product_id = ? AND store_id = ?').get(productId, storeId) as any;
       const qtyBefore = current ? current.quantity : 0;
       const delta = newQuantity - qtyBefore;
@@ -595,6 +641,7 @@ export function registerIpcHandlers() {
     if (fromStoreId === toStoreId) throw new Error('Les boutiques source et destination doivent être différentes.');
 
     return ctx.db.transaction(() => {
+      refuserSiSuiviParCouleur(ctx.db, productId, 'transferez les quantites');
       const src = ctx.db.prepare('SELECT quantity FROM product_stock WHERE product_id = ? AND store_id = ?').get(productId, fromStoreId) as any;
       const srcQty = src ? src.quantity : 0;
       if (srcQty < qty) throw new Error(`Stock insuffisant : ${srcQty} disponible(s) dans la boutique source.`);
@@ -705,14 +752,64 @@ export function registerIpcHandlers() {
         const qty = positiveInt(it?.qty, 'quantité');
         const unitPrice = int(it?.unitPrice);
         if (unitPrice < 0) throw new Error('Prix de vente négatif refusé.');
-        const product = ctx.db.prepare('SELECT id, code, name, price_achat FROM products WHERE id = ?').get(productId) as any;
+        const product = ctx.db.prepare(
+          'SELECT id, code, name, price_achat, color_stock_tracked FROM products WHERE id = ?'
+        ).get(productId) as any;
         if (!product) throw new Error(`Article #${productId} introuvable.`);
+
+        // Article decline en couleurs : la ligne doit dire laquelle est vendue,
+        // sinon le stock de la couleur ne peut pas etre decremente.
+        const couleurs = ctx.db.prepare('SELECT id FROM product_colors WHERE product_id = ?').all(productId) as any[];
+        let productColorId: number | null = it?.productColorId ? positiveInt(it.productColorId, 'couleur') : null;
+        if (product.color_stock_tracked && couleurs.length) {
+          if (!productColorId) {
+            throw new Error(`Choisissez la couleur vendue pour « ${product.name} ».`);
+          }
+          if (!couleurs.some(c => Number(c.id) === productColorId)) {
+            throw new Error(`Couleur inconnue pour « ${product.name} ».`);
+          }
+        } else if (productColorId && !couleurs.some(c => Number(c.id) === productColorId)) {
+          productColorId = null;
+        }
+
         const lineTotal = qty * unitPrice;
         subtotal += lineTotal;
-        return { productId, qty, unitPrice, lineTotal, product, priceTier: it?.priceTier || 'detail', productColorId: it?.productColorId || null };
+        return {
+          productId, qty, unitPrice, lineTotal, product,
+          priceTier: it?.priceTier || 'detail',
+          productColorId
+        };
       });
 
-      const discount = Math.min(Math.max(int(payload?.discount), 0), subtotal);
+      // Prix plancher : ni la modification du prix unitaire, ni la remise ne
+      // peuvent faire passer la vente sous le prix d'achat. Le renderer applique
+      // deja la regle, mais c'est ici qu'elle est opposable.
+      const pourPlancher = lines.map(l => ({
+        qty: l.qty,
+        unitPrice: l.unitPrice,
+        unitCost: l.product.price_achat || 0,
+        label: `${l.product.code} — ${l.product.name}`
+      }));
+
+      const sousCout = findPriceFloorViolations(pourPlancher);
+      if (sousCout.length) {
+        const d = sousCout[0];
+        throw new Error(
+          `Vente a perte refusee : « ${d.label} » est propose a ${(d.unitPrice / 100).toFixed(2)} DA ` +
+          `alors que son prix d'achat est de ${(d.unitCost / 100).toFixed(2)} DA.`
+        );
+      }
+
+      const remiseDemandee = Math.min(Math.max(int(payload?.discount), 0), subtotal);
+      const verif = checkDiscount(pourPlancher, remiseDemandee);
+      if (!verif.allowed) {
+        throw new Error(
+          `Remise refusee : ${(remiseDemandee / 100).toFixed(2)} DA ramenerait le ticket sous son prix d'achat ` +
+          `(${(verif.totalCost / 100).toFixed(2)} DA). Remise maximale : ${(verif.maxDiscount / 100).toFixed(2)} DA.`
+        );
+      }
+
+      const discount = remiseDemandee;
       const total = subtotal - discount;
       const requestedPaid = int(payload?.amountPaid);
       const actualPaid = paymentType === 'credit' ? 0 : paymentType === 'mixed' ? Math.min(Math.max(requestedPaid, 0), total) : total;
@@ -755,6 +852,28 @@ export function registerIpcHandlers() {
           throw new Error(`Stock insuffisant pour « ${line.product.name} » : ${qtyBefore} en stock, ${line.qty} demandé(s).`);
         }
         const qtyAfter = qtyBefore - line.qty;
+
+        // Stock de la couleur vendue. Le total de l'article reste la somme des
+        // couleurs : les deux sont decrementes dans la meme transaction.
+        if (line.productColorId && line.product.color_stock_tracked) {
+          const couleurRow = ctx.db.prepare(
+            'SELECT quantity FROM product_color_stock WHERE product_color_id = ? AND store_id = ?'
+          ).get(line.productColorId, storeId) as any;
+          const couleurAvant = couleurRow ? couleurRow.quantity : 0;
+          if (!settings.allowNegativeStock && couleurAvant < line.qty) {
+            const nom = ctx.db.prepare(
+              'SELECT c.name FROM product_colors pc JOIN colors c ON pc.color_id = c.id WHERE pc.id = ?'
+            ).get(line.productColorId) as any;
+            throw new Error(
+              `Stock insuffisant pour « ${line.product.name} » en ${nom?.name || 'cette couleur'} : ` +
+              `${couleurAvant} en stock, ${line.qty} demandé(s).`
+            );
+          }
+          ctx.db.prepare(`
+            INSERT INTO product_color_stock (product_color_id, store_id, quantity) VALUES (?, ?, ?)
+            ON CONFLICT(product_color_id, store_id) DO UPDATE SET quantity = excluded.quantity
+          `).run(line.productColorId, storeId, couleurAvant - line.qty);
+        }
 
         // Coût figé au moment de la vente : une modification ultérieure du prix
         // d'achat ne peut plus altérer le bénéfice historique.
@@ -895,6 +1014,12 @@ export function registerIpcHandlers() {
           ON CONFLICT(product_id, store_id) DO UPDATE SET quantity = excluded.quantity
         `).run(saleItem.product_id, storeId, qtyAfter);
 
+        // L'article revient dans la couleur ou il est parti : le detail par
+        // couleur doit rester egal au total, retour compris.
+        if (saleItem.product_color_id) {
+          crediterCouleur(ctx.db, saleItem.product_color_id, storeId, qtyReturned);
+        }
+
         insertMovement.run(
           saleItem.product_id, storeId, STOCK_MOVEMENT_CODES.RETOUR, qtyBefore, qtyAfter, qtyReturned,
           saleItem.unit_cost_snapshot, reason, ctx.session.userId, returnId
@@ -976,6 +1101,7 @@ export function registerIpcHandlers() {
           INSERT INTO product_stock (product_id, store_id, quantity) VALUES (?, ?, ?)
           ON CONFLICT(product_id, store_id) DO UPDATE SET quantity = excluded.quantity
         `).run(it.product_id, storeId, qtyBefore + toRestore);
+        if (it.product_color_id) crediterCouleur(ctx.db, it.product_color_id, storeId, toRestore);
         insertMovement.run(it.product_id, storeId, STOCK_MOVEMENT_CODES.RETOUR, qtyBefore, qtyBefore + toRestore, toRestore, it.unit_cost_snapshot, `Annulation vente #${saleId}`, ctx.session.userId, saleId);
       }
 
@@ -1021,9 +1147,27 @@ export function registerIpcHandlers() {
         const qty = positiveInt(it?.qty, 'quantité');
         const unitCost = int(it?.unitCost);
         if (unitCost < 0) throw new Error('Prix d\'achat négatif refusé.');
-        const product = ctx.db.prepare('SELECT id, code, name, price_achat FROM products WHERE id = ?').get(productId) as any;
+        const product = ctx.db.prepare(
+          'SELECT id, code, name, price_achat, color_stock_tracked FROM products WHERE id = ?'
+        ).get(productId) as any;
         if (!product) throw new Error(`Article #${productId} introuvable.`);
-        return { productId, qty, unitCost, lineTotal: qty * unitCost, product };
+
+        // Article suivi couleur par couleur : la reception doit dire laquelle
+        // elle alimente, faute de quoi le detail cesserait d'egaler le total.
+        const couleurs = ctx.db.prepare('SELECT id FROM product_colors WHERE product_id = ?').all(productId) as any[];
+        let productColorId: number | null = it?.productColorId ? positiveInt(it.productColorId, 'couleur') : null;
+        if (product.color_stock_tracked && couleurs.length) {
+          if (!productColorId) {
+            throw new Error(`Indiquez la couleur recue pour « ${product.name} ».`);
+          }
+          if (!couleurs.some(c => Number(c.id) === productColorId)) {
+            throw new Error(`Couleur inconnue pour « ${product.name} ».`);
+          }
+        } else if (productColorId && !couleurs.some(c => Number(c.id) === productColorId)) {
+          productColorId = null;
+        }
+
+        return { productId, qty, unitCost, lineTotal: qty * unitCost, product, productColorId };
       });
 
       const total = lines.reduce((sum, l) => sum + l.lineTotal, 0);
@@ -1035,8 +1179,8 @@ export function registerIpcHandlers() {
       ).run(storeId, supplierId, ctx.session.userId, total, amountPaid, paymentType, text(payload?.reference)).lastInsertRowid);
 
       const insertItem = ctx.db.prepare(`
-        INSERT INTO purchase_items (purchase_id, product_id, qty, unit_cost, line_total, cost_strategy, cost_before, cost_after)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO purchase_items (purchase_id, product_id, product_color_id, qty, unit_cost, line_total, cost_strategy, cost_before, cost_after)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       const insertMovement = ctx.db.prepare(`
         INSERT INTO stock_movements (product_id, store_id, movement_code, qty_before, qty_after, delta, unit_cost, note, user_id, ref_type, ref_id)
@@ -1068,7 +1212,9 @@ export function registerIpcHandlers() {
           ON CONFLICT(product_id, store_id) DO UPDATE SET quantity = excluded.quantity
         `).run(line.productId, storeId, qtyAfter);
 
-        insertItem.run(purchaseId, line.productId, line.qty, line.unitCost, line.lineTotal, resolution.strategy, resolution.previousCost, resolution.newCost);
+        insertItem.run(purchaseId, line.productId, line.productColorId, line.qty, line.unitCost, line.lineTotal, resolution.strategy, resolution.previousCost, resolution.newCost);
+        // La couleur recue monte en meme temps que le total de l'article.
+        if (line.productColorId) crediterCouleur(ctx.db, line.productColorId, storeId, line.qty);
         insertMovement.run(
           line.productId, storeId, STOCK_MOVEMENT_CODES.ACHAT, qtyBefore, qtyAfter, line.qty,
           line.unitCost, text(payload?.reference) || null, ctx.session.userId, purchaseId
@@ -1797,20 +1943,116 @@ function applyPermissions(ctx: Ctx, userId: number, rows: any[]) {
   })();
 }
 
-function applyProductColors(db: ReturnType<typeof getLocalDb>, productId: number, payload: any) {
-  if (payload?.colorIds === undefined && payload?.mergeColorIds === undefined) return;
+/**
+ * Reecrit les couleurs d'un article, puis leur stock.
+ *
+ * `colorStock` est indexe par identifiant de couleur (colors.id) puis par
+ * boutique : `{ "3": { "1": 10, "2": 4 } }`. Les lignes de product_colors sont
+ * recreees a chaque enregistrement, leurs identifiants changent donc ; indexer
+ * par couleur plutot que par ligne garde la saisie stable.
+ *
+ * Renvoie le total par boutique, que l'appelant reporte dans product_stock :
+ * c'est ce qui dispense l'utilisateur de saisir une quantite globale.
+ */
+function applyProductColors(
+  db: ReturnType<typeof getLocalDb>,
+  productId: number,
+  payload: any
+): { tracked: boolean; parBoutique: Map<number, number> } {
+  const parBoutique = new Map<number, number>();
+  if (payload?.colorIds === undefined && payload?.mergeColorIds === undefined) {
+    return { tracked: false, parBoutique };
+  }
+
   db.prepare('DELETE FROM product_colors WHERE product_id = ?').run(productId);
   const insert = db.prepare('INSERT INTO product_colors (product_id, color_id, merge_group_id) VALUES (?, ?, ?)');
   const mode = payload?.colorMode || 'single';
 
+  /** colors.id -> product_colors.id, pour rattacher le stock saisi. */
+  const lignes = new Map<number, number>();
+
   if (mode === 'single' && payload?.colorIds?.length) {
-    insert.run(productId, payload.colorIds[0], null);
+    const id = Number(insert.run(productId, payload.colorIds[0], null).lastInsertRowid);
+    lignes.set(Number(payload.colorIds[0]), id);
   } else if (mode === 'variants' && payload?.colorIds?.length) {
-    for (const cid of payload.colorIds) insert.run(productId, cid, null);
+    for (const cid of payload.colorIds) {
+      const id = Number(insert.run(productId, cid, null).lastInsertRowid);
+      lignes.set(Number(cid), id);
+    }
   } else if (mode === 'merged' && payload?.mergeColorIds?.length) {
     const groupId = `merge-${productId}-${Date.now()}`;
-    for (const cid of payload.mergeColorIds) insert.run(productId, cid, groupId);
+    for (const cid of payload.mergeColorIds) {
+      const id = Number(insert.run(productId, cid, groupId).lastInsertRowid);
+      lignes.set(Number(cid), id);
+    }
   }
+
+  // Le comptage par couleur n'a de sens que sur un article decline en variantes.
+  const saisie = payload?.colorStock;
+  if (mode !== 'variants' || !saisie || typeof saisie !== 'object' || !lignes.size) {
+    return { tracked: false, parBoutique };
+  }
+
+  const insertStock = db.prepare(
+    'INSERT INTO product_color_stock (product_color_id, store_id, quantity) VALUES (?, ?, ?)'
+  );
+  const boutiques = (db.prepare('SELECT id FROM stores').all() as any[]).map(r => Number(r.id));
+
+  let renseigne = false;
+  for (const [colorId, ligneId] of lignes) {
+    const parCouleur = saisie[String(colorId)];
+    for (const storeId of boutiques) {
+      const qty = Math.max(0, int(parCouleur?.[String(storeId)]));
+      insertStock.run(ligneId, storeId, qty);
+      if (qty > 0) renseigne = true;
+      parBoutique.set(storeId, (parBoutique.get(storeId) || 0) + qty);
+    }
+  }
+
+  // Une saisie entierement a zero ne doit pas ecraser un stock global existant
+  // par accident : on ne bascule l'article en comptage par couleur que si au
+  // moins une quantite a ete renseignee.
+  if (!renseigne) {
+    db.prepare(
+      'DELETE FROM product_color_stock WHERE product_color_id IN (SELECT id FROM product_colors WHERE product_id = ?)'
+    ).run(productId);
+    parBoutique.clear();
+    return { tracked: false, parBoutique };
+  }
+
+  return { tracked: true, parBoutique };
+}
+
+/**
+ * Un article dont les quantites sont tenues couleur par couleur ne peut pas
+ * voir son total corrige globalement : la correction se fait sur la fiche
+ * article, couleur par couleur, sinon le detail cesserait d'egaler le total.
+ */
+function refuserSiSuiviParCouleur(db: ReturnType<typeof getLocalDb>, productId: number, action: string) {
+  const row = db.prepare('SELECT name, color_stock_tracked FROM products WHERE id = ?').get(productId) as any;
+  if (row?.color_stock_tracked) {
+    throw new Error(
+      `« ${row.name} » tient son stock couleur par couleur : ${action} depuis la fiche article, ` +
+      `onglet des couleurs. Le total se recalcule tout seul.`
+    );
+  }
+}
+
+/** Recredite le stock d'une couleur (retour client, annulation de vente). */
+function crediterCouleur(
+  db: ReturnType<typeof getLocalDb>,
+  productColorId: number,
+  storeId: number,
+  qty: number
+) {
+  if (!productColorId || qty <= 0) return;
+  const row = db.prepare(
+    'SELECT quantity FROM product_color_stock WHERE product_color_id = ? AND store_id = ?'
+  ).get(productColorId, storeId) as any;
+  db.prepare(`
+    INSERT INTO product_color_stock (product_color_id, store_id, quantity) VALUES (?, ?, ?)
+    ON CONFLICT(product_color_id, store_id) DO UPDATE SET quantity = excluded.quantity
+  `).run(productColorId, storeId, (row ? row.quantity : 0) + qty);
 }
 
 function applyProductCompat(db: ReturnType<typeof getLocalDb>, productId: number, modelIds: any) {

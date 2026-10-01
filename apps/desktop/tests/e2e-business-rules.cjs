@@ -210,6 +210,140 @@ const costOf = (pid) => DB.prepare('SELECT price_achat c FROM products WHERE id=
   check('marge annulee apres retour total', rep.totalBeneficesBrut, 0);
   check('CA net ramene a zero apres retour total', rep.totalCA, 0);
 
+  // ---------------------------------------------------------------------
+  section('Stock par couleur');
+
+  const couleurs = DB.prepare('SELECT id, name FROM colors ORDER BY id LIMIT 3').all();
+  const [rouge, bleu, vert] = couleurs;
+
+  const multi = await call('create-product', {
+    name: 'CARENAGE MULTICOLORE',
+    priceAchat: 100000, priceDetail: 160000, priceSemiGros: 140000, priceGros: 120000,
+    colorMode: 'variants',
+    colorIds: [rouge.id, bleu.id, vert.id],
+    colorStock: {
+      [String(rouge.id)]: { '1': 7 },
+      [String(bleu.id)]: { '1': 3 },
+      [String(vert.id)]: { '1': 0 }
+    },
+    // Quantite globale envoyee expres : elle doit etre ignoree.
+    initialStock: { '1': 999 }
+  });
+
+  const fiche = (await call('get-products', { q: 'CARENAGE MULTICOLORE', storeId: STORE }))[0];
+  check('total calcule depuis les couleurs', fiche.totalStock, 10);
+  check('quantite globale envoyee ignoree', fiche.totalStock !== 999, true);
+  check('article marque comme suivi par couleur', fiche.colorStockTracked, true);
+  const parNom = Object.fromEntries(fiche.colors.map(c => [c.name, c.stock]));
+  check('stock de la couleur 1', parNom[rouge.name], 7);
+  check('stock de la couleur 2', parNom[bleu.name], 3);
+  check('stock de la couleur 3', parNom[vert.name], 0);
+
+  const ligneRouge = fiche.colors.find(c => c.name === rouge.name).id;
+  const ligneVert = fiche.colors.find(c => c.name === vert.name).id;
+
+  try {
+    await call('create-sale', { storeId: STORE, items: [{ productId: multi.id, qty: 1, unitPrice: 160000 }] });
+    check('vente sans couleur refusee', 'acceptee', 'refusee');
+  } catch (e) {
+    check('vente sans couleur refusee', /couleur/i.test(e.message), true);
+  }
+
+  try {
+    await call('create-sale', {
+      storeId: STORE,
+      items: [{ productId: multi.id, qty: 1, unitPrice: 160000, productColorId: ligneVert }]
+    });
+    check('vente d une couleur epuisee refusee', 'acceptee', 'refusee');
+  } catch (e) {
+    check('vente d une couleur epuisee refusee', /insuffisant/i.test(e.message), true);
+  }
+
+  await call('create-sale', {
+    storeId: STORE,
+    items: [{ productId: multi.id, qty: 2, unitPrice: 160000, productColorId: ligneRouge }]
+  });
+  const apresVente = (await call('get-products', { q: 'CARENAGE MULTICOLORE', storeId: STORE }))[0];
+  check('couleur vendue decrementee', apresVente.colors.find(c => c.name === rouge.name).stock, 5);
+  check('autre couleur intacte', apresVente.colors.find(c => c.name === bleu.name).stock, 3);
+  check('total = somme des couleurs apres vente', apresVente.totalStock, 8);
+  check(
+    'total egal a la somme detaillee',
+    apresVente.colors.reduce((acc, c) => acc + c.stock, 0),
+    apresVente.totalStock
+  );
+
+  try {
+    await call('adjust-stock', { productId: multi.id, storeId: STORE, newQuantity: 50, note: 'test' });
+    check('ajustement global refuse sur article suivi par couleur', 'accepte', 'refuse');
+  } catch (e) {
+    check('ajustement global refuse sur article suivi par couleur', /couleur par couleur/i.test(e.message), true);
+  }
+
+  try {
+    await call('create-purchase', {
+      storeId: STORE, supplierId,
+      items: [{ productId: multi.id, qty: 5, unitCost: 100000 }]
+    });
+    check('achat sans couleur refuse', 'accepte', 'refuse');
+  } catch (e) {
+    check('achat sans couleur refuse', /couleur/i.test(e.message), true);
+  }
+
+  await call('create-purchase', {
+    storeId: STORE, supplierId,
+    items: [{ productId: multi.id, qty: 5, unitCost: 100000, productColorId: ligneVert }]
+  });
+  const apresAchat = (await call('get-products', { q: 'CARENAGE MULTICOLORE', storeId: STORE }))[0];
+  check('couleur recue creditee', apresAchat.colors.find(c => c.name === vert.name).stock, 5);
+  check(
+    'total toujours egal a la somme des couleurs apres achat',
+    apresAchat.colors.reduce((acc, c) => acc + c.stock, 0),
+    apresAchat.totalStock
+  );
+
+  // ---------------------------------------------------------------------
+  section('Prix plancher : jamais sous le prix d achat');
+
+  const pPlancher = await call('create-product', {
+    name: 'ARTICLE PLANCHER', priceAchat: 50000, priceDetail: 80000,
+    initialStock: { '1': 20 }
+  });
+
+  try {
+    await call('create-sale', {
+      storeId: STORE,
+      items: [{ productId: pPlancher.id, qty: 1, unitPrice: 49900 }]
+    });
+    check('prix unitaire sous le cout refuse', 'accepte', 'refuse');
+  } catch (e) {
+    check('prix unitaire sous le cout refuse', /perte/i.test(e.message), true);
+  }
+
+  const auCout = await call('create-sale', {
+    storeId: STORE,
+    items: [{ productId: pPlancher.id, qty: 1, unitPrice: 50000 }]
+  });
+  check('vente exactement au prix d achat acceptee', auCout.saleId > 0, true);
+
+  try {
+    await call('create-sale', {
+      storeId: STORE,
+      items: [{ productId: pPlancher.id, qty: 2, unitPrice: 80000 }],
+      discount: 70000
+    });
+    check('remise sous le cout refusee', 'acceptee', 'refusee');
+  } catch (e) {
+    check('remise sous le cout refusee', /Remise refusee/i.test(e.message), true);
+  }
+
+  const avecRemise = await call('create-sale', {
+    storeId: STORE,
+    items: [{ productId: pPlancher.id, qty: 2, unitPrice: 80000 }],
+    discount: 60000
+  });
+  check('remise laissant la vente au cout acceptee', avecRemise.saleId > 0, true);
+
   console.log('\n' + pass + ' verifications reussies, ' + fail + ' echouees');
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('ERREUR HARNAIS:', e); process.exit(1); });

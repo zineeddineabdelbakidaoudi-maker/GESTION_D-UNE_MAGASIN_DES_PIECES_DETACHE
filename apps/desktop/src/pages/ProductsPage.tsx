@@ -65,6 +65,10 @@ export const ProductsPage: React.FC = () => {
   const [location, setLocation] = useState<string>('');
   const [unit, setUnit] = useState<string>('PCS');
   const [selectedColorId, setSelectedColorId] = useState<number | ''>('');
+  // Article decline en plusieurs couleurs : la quantite est saisie couleur par
+  // couleur et le total de l'article en decoule.
+  const [colorMode, setColorMode] = useState<'single' | 'variants'>('single');
+  const [variantQty, setVariantQty] = useState<Record<number, string>>({});
   const [manualBarcode, setManualBarcode] = useState<string>('');
   const [barcodesList, setBarcodesList] = useState<string[]>([]);
   const [compatibleMotos, setCompatibleMotos] = useState<number[]>([]);
@@ -215,15 +219,25 @@ export const ProductsPage: React.FC = () => {
         location: location.toUpperCase().trim(),
         unit: unit || 'PCS',
         photoBase64: photoBase64 || null,
-        colorMode: 'single',
-        colorIds: selectedColorId ? [Number(selectedColorId)] : [],
+        colorMode: enVariantes ? 'variants' : 'single',
+        colorIds: enVariantes
+          ? variantColorIds
+          : (selectedColorId ? [Number(selectedColorId)] : []),
         mergeColorIds: [],
+        // Indexe par couleur puis par boutique. Le process principal en deduit
+        // le total de l'article : aucune quantite globale n'est saisie ici.
+        colorStock: enVariantes
+          ? Object.fromEntries(variantColorIds.map(id => [
+              String(id),
+              { '1': parseInt(variantQty[id], 10) || 0 }
+            ]))
+          : undefined,
         barcodes: barcodesList,
         compatibleModelIds: compatibleMotos,
         compatibleMotos: compatibleMotos,
-        initialStock: {
-          '1': parseInt(initialStockStore1, 10) || 0
-        }
+        initialStock: enVariantes
+          ? undefined
+          : { '1': parseInt(initialStockStore1, 10) || 0 }
       };
 
       if (editingProduct) {
@@ -260,6 +274,8 @@ export const ProductsPage: React.FC = () => {
     setLocation('');
     setUnit('PCS');
     setSelectedColorId('');
+    setColorMode('single');
+    setVariantQty({});
     setBarcodesList([]);
     setManualBarcode('');
     setCompatibleMotos([]);
@@ -283,8 +299,15 @@ export const ProductsPage: React.FC = () => {
     setPriceGros(p.priceGros ? String(p.priceGros / 100) : '');
     setLocation((p as any).location || '');
     setUnit((p as any).unit || 'PCS');
-    const colorIds = (p.colors || []).map((c: any) => c.colorId);
-    setSelectedColorId(colorIds[0] || '');
+    const couleurs = (p.colors || []) as any[];
+    const suivi = Boolean((p as any).colorStockTracked);
+    setColorMode(suivi ? 'variants' : 'single');
+    setSelectedColorId(suivi ? '' : (couleurs[0]?.colorId || ''));
+    setVariantQty(
+      suivi
+        ? Object.fromEntries(couleurs.map(c => [c.colorId, String(c.stock ?? 0)]))
+        : {}
+    );
     setBarcodesList((p.barcodes || []).map((b: any) => b.barcodeValue));
     setCompatibleMotos(((p as any).compatibleModels || []).map((m: any) => m.id));
     setPhotoBase64((p as any).photo_base64 || '');
@@ -336,6 +359,13 @@ export const ProductsPage: React.FC = () => {
 
   // Category conditional check for color picker
   const selectedCat = categories.find(c => c.id === Number(categoryId));
+  // Couleurs retenues : celles dont la quantite a ete renseignee.
+  const variantColorIds = Object.keys(variantQty)
+    .map(Number)
+    .filter(id => variantQty[id] !== undefined && variantQty[id] !== '');
+  const variantTotal = variantColorIds.reduce((sum, id) => sum + (parseInt(variantQty[id], 10) || 0), 0);
+  const enVariantes = colorMode === 'variants' && variantColorIds.length > 0;
+
   const isColorEligible = selectedCat ? /casque|car[eéè]nage|accessoire|carrosserie|plastique|couleur/i.test(selectedCat.name) : false;
 
   return (
@@ -784,12 +814,21 @@ export const ProductsPage: React.FC = () => {
                       type="number"
                       min="0"
                       placeholder="0"
-                      value={initialStockStore1}
+                      readOnly={enVariantes}
+                      value={enVariantes ? String(variantTotal) : initialStockStore1}
                       onChange={e => setInitialStockStore1(e.target.value)}
+                      title={enVariantes ? 'Somme des quantités saisies par couleur' : undefined}
                       className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none ${
-                        'bg-slate-800 border-slate-700 text-slate-100'
+                        enVariantes
+                          ? 'bg-slate-900 border-slate-800 text-emerald-500 cursor-not-allowed'
+                          : 'bg-slate-800 border-slate-700 text-slate-100'
                       }`}
                     />
+                    {enVariantes && (
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        {isAr ? 'مجموع الكميات حسب اللون' : 'Somme des quantités par couleur'}
+                      </p>
+                    )}
                   </div>
 
                   {/* Row 6: Emplacement (full width) */}
@@ -987,24 +1026,86 @@ export const ProductsPage: React.FC = () => {
                     </div>
                   )}
 
-                  <div>
-                    <label className={`text-[11px] font-bold ${'text-slate-300'}`}>
-                      {isAr ? 'اختر لون القطعة :' : 'Sélectionner la couleur :'}
-                    </label>
-                    <select
-                      disabled={!isColorEligible}
-                      value={selectedColorId}
-                      onChange={e => setSelectedColorId(e.target.value ? parseInt(e.target.value, 10) : '')}
-                      className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-bold outline-none ${
-                        'bg-slate-800 border-slate-700 text-slate-100'
-                      }`}
-                    >
-                      <option value="">{isAr ? '-- بدون لون / موحد --' : '-- Sans couleur spécifique / Standard --'}</option>
-                      {colors.map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
+                  {/* Couleur unique, ou article decline avec une quantite par couleur. */}
+                  <div className="flex gap-2">
+                    {([
+                      { id: 'single' as const, label: isAr ? 'لون واحد' : 'Couleur unique' },
+                      { id: 'variants' as const, label: isAr ? 'عدة ألوان (كمية لكل لون)' : 'Plusieurs couleurs (quantité par couleur)' }
+                    ]).map(opt => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        disabled={!isColorEligible}
+                        onClick={() => setColorMode(opt.id)}
+                        className={`flex-1 px-3 py-2 rounded-xl text-[11px] font-bold border transition-colors disabled:opacity-40 ${
+                          colorMode === opt.id
+                            ? 'border-blue-500 bg-blue-500/15 text-blue-300'
+                            : 'border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
                   </div>
+
+                  {colorMode === 'single' ? (
+                    <div>
+                      <label className={`text-[11px] font-bold ${'text-slate-300'}`}>
+                        {isAr ? 'اختر لون القطعة :' : 'Sélectionner la couleur :'}
+                      </label>
+                      <select
+                        disabled={!isColorEligible}
+                        value={selectedColorId}
+                        onChange={e => setSelectedColorId(e.target.value ? parseInt(e.target.value, 10) : '')}
+                        className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-bold outline-none ${
+                          'bg-slate-800 border-slate-700 text-slate-100'
+                        }`}
+                      >
+                        <option value="">{isAr ? '-- بدون لون / موحد --' : '-- Sans couleur spécifique / Standard --'}</option>
+                        {colors.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-[11px] text-slate-400">
+                        {isAr
+                          ? 'أدخل الكمية لكل لون. المجموع يُحسب تلقائيًا.'
+                          : "Saisissez la quantité de chaque couleur. Le total de l'article se calcule tout seul — laissez vide une couleur que vous ne tenez pas."}
+                      </p>
+                      <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1">
+                        {colors.map(c => (
+                          <div key={c.id} className="flex items-center gap-2">
+                            <span
+                              className="w-3.5 h-3.5 rounded-full border border-slate-600 shrink-0"
+                              style={{ backgroundColor: c.hexCode || c.hex_code || '#888' }}
+                            />
+                            <span className="flex-1 text-[11px] font-bold text-slate-200 truncate">{c.name}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="—"
+                              value={variantQty[c.id] ?? ''}
+                              onChange={e => setVariantQty(prev => {
+                                const suivant = { ...prev };
+                                if (e.target.value === '') delete suivant[c.id];
+                                else suivant[c.id] = e.target.value;
+                                return suivant;
+                              })}
+                              className="w-24 border rounded-lg px-2 py-1.5 text-xs font-mono font-bold text-center outline-none bg-slate-800 border-slate-700 text-slate-100"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                        <span className="text-[11px] font-bold text-slate-300">
+                          {isAr ? 'المجموع المحسوب' : 'Total calculé'}
+                        </span>
+                        <span className="text-sm font-mono font-black text-emerald-500">{variantTotal}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1069,12 +1170,20 @@ export const ProductsPage: React.FC = () => {
                   <input
                     type="number"
                     min="0"
-                    value={initialStockStore1}
+                    readOnly={enVariantes}
+                    value={enVariantes ? String(variantTotal) : initialStockStore1}
                     onChange={e => setInitialStockStore1(e.target.value)}
                     className={`w-full mt-1 border rounded-xl px-3 py-2 text-xs font-bold text-center text-emerald-500 outline-none ${
-                      'bg-slate-800 border-slate-700'
+                      enVariantes ? 'bg-slate-900 border-slate-800 cursor-not-allowed' : 'bg-slate-800 border-slate-700'
                     }`}
                   />
+                  {enVariantes && (
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      {isAr
+                        ? 'يُحسب تلقائيًا من الكميات حسب اللون.'
+                        : 'Calculé automatiquement depuis les quantités par couleur.'}
+                    </p>
+                  )}
                 </div>
               </div>
 

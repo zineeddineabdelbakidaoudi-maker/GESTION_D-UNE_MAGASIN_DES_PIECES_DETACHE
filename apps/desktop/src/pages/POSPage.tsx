@@ -3,7 +3,7 @@ import { useStore, CartItem } from '../store/useStore';
 import { invokeIpc } from '../api/electronBridge';
 import { runFullSync } from '../api/syncEngine';
 import { Product, Client, PriceTier, PaymentMethod } from '@gestion-veloo/shared';
-import { formatDZD } from '@gestion-veloo/shared';
+import { formatDZD, isUnitPriceAllowed } from '@gestion-veloo/shared';
 import { PRICE_TIER_LABELS } from '@gestion-veloo/shared';
 import { 
   Search, 
@@ -71,6 +71,9 @@ export const POSPage: React.FC = () => {
   const [paymentType, setPaymentType] = useState<PaymentMethod>('cash');
   const [amountPaidInput, setAmountPaidInput] = useState<string>('');
   const [discountInput, setDiscountInput] = useState<string>('0');
+  // Article decline en couleurs : on demande laquelle part avant de l'ajouter
+  // au panier, sinon le stock de la couleur ne peut pas etre decremente.
+  const [choixCouleur, setChoixCouleur] = useState<{ product: Product; tier: PriceTier } | null>(null);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [lastReceiptText, setLastReceiptText] = useState('');
@@ -156,6 +159,20 @@ export const POSPage: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [products]);
 
+  /**
+   * Ajoute au panier, en demandant d'abord la couleur quand l'article en
+   * compte plusieurs. Tous les points d'ajout passent par ici : grille, liste,
+   * douchette.
+   */
+  const ajouterAuPanier = (p: Product, tier: PriceTier = 'detail') => {
+    const couleurs = ((p as any).colors || []) as any[];
+    if ((p as any).colorStockTracked && couleurs.length > 0) {
+      setChoixCouleur({ product: p, tier });
+      return;
+    }
+    addToCart(p, tier);
+  };
+
   const handleBarcodeScanned = (codeValue: string) => {
     const found = products.find(p => 
       p.code.toLowerCase() === codeValue.toLowerCase() ||
@@ -163,7 +180,7 @@ export const POSPage: React.FC = () => {
     );
 
     if (found) {
-      addToCart(found, 'detail');
+      ajouterAuPanier(found, 'detail');
       setSearchQuery('');
     } else {
       setSearchQuery(codeValue);
@@ -172,6 +189,12 @@ export const POSPage: React.FC = () => {
 
   // Cart calculations
   const subtotal = cart.reduce((sum, item) => sum + item.lineTotal, 0);
+  // Lignes vendues sous leur prix d'achat. Le process principal refuse de
+  // toute facon la vente ; fermer le bouton evite d'aller jusqu'a l'erreur.
+  const lignesSousCout = cart.filter(it => {
+    const cout = (it.product as any).priceAchat || 0;
+    return cout > 0 && !isUnitPriceAllowed(it.unitPrice, cout);
+  });
   const discountCentimes = Math.round((parseFloat(discountInput) || 0) * 100);
   const total = Math.max(0, subtotal - discountCentimes);
   const amountPaidCentimes = Math.round((parseFloat(amountPaidInput) || 0) * 100);
@@ -456,7 +479,7 @@ export const POSPage: React.FC = () => {
             return (
               <div
                 key={p.id}
-                onClick={() => !isOutOfStock && addToCart(p, 'detail')}
+                onClick={() => !isOutOfStock && ajouterAuPanier(p, 'detail')}
                 onMouseEnter={(e) => {
                   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                   setTooltipPos({ x: rect.left, y: rect.top });
@@ -609,7 +632,7 @@ export const POSPage: React.FC = () => {
                       className={`transition-colors ${
                         isOut ? 'opacity-50' : 'hover:bg-slate-800/50 cursor-pointer'
                       }`}
-                      onClick={() => !isOut && addToCart(p, 'detail')}
+                      onClick={() => !isOut && ajouterAuPanier(p, 'detail')}
                     >
                       <td className="px-4 py-2.5">
                         <div className="font-bold text-slate-100">{p.name}</div>
@@ -625,7 +648,7 @@ export const POSPage: React.FC = () => {
                       <td className="px-4 py-2.5 text-center">
                         <button
                           disabled={isOut}
-                          onClick={e => { e.stopPropagation(); !isOut && addToCart(p, 'detail'); }}
+                          onClick={e => { e.stopPropagation(); !isOut && ajouterAuPanier(p, 'detail'); }}
                           className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white text-[10px] font-bold rounded-lg"
                         >
                           + Panier
@@ -732,22 +755,55 @@ export const POSPage: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* Editable Unit Price */}
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={Math.round((it.unitPrice || 0) / 100)}
-                      onChange={e => {
-                        const val = Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 100));
-                        updateCartPrice(it.product.id, val);
-                      }}
-                      title={isAr ? 'تعديل السعر الفردي' : 'Modifier prix unitaire'}
-                      className="w-20 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 text-center outline-none focus:border-blue-500"
-                    />
-                    <span className="text-[10px] text-slate-500 font-bold">DA</span>
-                  </div>
+                  {/* Prix unitaire modifiable, jamais sous le prix d'achat. */}
+                  {(() => {
+                    const cout = (it.product as any).priceAchat || 0;
+                    // Un caissier sans droit de voir les couts recoit priceAchat a null :
+                    // le plancher est alors applique par le process principal seul.
+                    const sousCout = cout > 0 && !isUnitPriceAllowed(it.unitPrice, cout);
+                    return (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min={cout > 0 ? Math.round(cout / 100) : 0}
+                          step="1"
+                          value={Math.round((it.unitPrice || 0) / 100)}
+                          // La saisie reste libre pendant la frappe : ramener la
+                          // valeur au plancher a chaque touche collerait les
+                          // chiffres suivants derriere le plancher (500 donnerait
+                          // 1000500). Le controle se fait a la sortie du champ.
+                          onChange={e => {
+                            updateCartPrice(
+                              it.product.id,
+                              Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 100))
+                            );
+                          }}
+                          onBlur={() => {
+                            if (cout > 0 && it.unitPrice < cout) {
+                              notifyError(
+                                new Error(
+                                  `${it.product.name} ne peut pas descendre sous son prix d'achat (${formatDZD(cout)}).`
+                                ),
+                                'Vente à perte refusée'
+                              );
+                              updateCartPrice(it.product.id, cout);
+                            }
+                          }}
+                          title={
+                            cout > 0
+                              ? `Prix d'achat : ${formatDZD(cout)} — plancher`
+                              : (isAr ? 'تعديل السعر الفردي' : 'Modifier prix unitaire')
+                          }
+                          className={`w-20 bg-slate-900 border rounded-lg px-2 py-1 text-xs font-mono font-bold text-center outline-none ${
+                            sousCout
+                              ? 'border-red-500 text-red-400'
+                              : 'border-slate-700 text-slate-100 focus:border-blue-500'
+                          }`}
+                        />
+                        <span className="text-[10px] text-slate-500 font-bold">DA</span>
+                      </div>
+                    );
+                  })()}
 
                   <span className="font-mono font-black text-xs text-emerald-400 shrink-0">{formatDZD(it.lineTotal)}</span>
                 </div>
@@ -769,6 +825,17 @@ export const POSPage: React.FC = () => {
             </div>
           </div>
 
+          {lignesSousCout.length > 0 && (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-xl border border-red-500/40 bg-red-500/10">
+              <Lock className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+              <p className="text-[11px] font-bold text-red-300 leading-snug">
+                {isAr
+                  ? 'لا يمكن البيع بأقل من سعر الشراء.'
+                  : `Vente à perte : ${lignesSousCout[0].product.name} est sous son prix d'achat.`}
+              </p>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <button
               onClick={clearCart}
@@ -783,7 +850,10 @@ export const POSPage: React.FC = () => {
                 setAmountPaidInput((total / 100).toString());
                 setShowCheckoutModal(true);
               }}
-              disabled={cart.length === 0}
+              disabled={cart.length === 0 || lignesSousCout.length > 0}
+              title={lignesSousCout.length > 0
+                ? `${lignesSousCout[0].product.name} est sous son prix d'achat.`
+                : undefined}
               className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black rounded-xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
             >
               <CreditCard className="w-4 h-4" />
@@ -794,6 +864,66 @@ export const POSPage: React.FC = () => {
       </div>
 
       {/* Modal: Payment / Checkout */}
+      {/* Choix de la couleur vendue */}
+      {choixCouleur && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-6"
+          onClick={() => setChoixCouleur(null)}
+        >
+          <div
+            className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-slate-800 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-100">
+                  {isAr ? 'أي لون تبيعه؟' : 'Quelle couleur vendez-vous ?'}
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">{choixCouleur.product.name}</p>
+              </div>
+              <button
+                onClick={() => setChoixCouleur(null)}
+                className="p-1 text-slate-500 hover:text-slate-200 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-2 max-h-80 overflow-y-auto">
+              {(((choixCouleur.product as any).colors || []) as any[]).map(c => {
+                const dispo = Number(c.stock ?? 0);
+                const epuise = dispo <= 0;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    disabled={epuise}
+                    onClick={() => {
+                      addToCart(choixCouleur.product, choixCouleur.tier, c.id, c.name);
+                      setChoixCouleur(null);
+                    }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-start transition-colors ${
+                      epuise
+                        ? 'border-slate-800 bg-slate-900 opacity-50 cursor-not-allowed'
+                        : 'border-slate-700 bg-slate-800 hover:border-blue-500 hover:bg-blue-500/10'
+                    }`}
+                  >
+                    <span
+                      className="w-5 h-5 rounded-full border border-slate-600 shrink-0"
+                      style={{ backgroundColor: c.hexCode || c.hex_code || '#888' }}
+                    />
+                    <span className="flex-1 text-xs font-bold text-slate-100">{c.name}</span>
+                    <span className={`text-[11px] font-mono font-bold ${epuise ? 'text-red-400' : 'text-emerald-400'}`}>
+                      {epuise ? (isAr ? 'نفد' : 'Épuisé') : `${dispo} ${isAr ? 'متوفر' : 'dispo'}`}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showCheckoutModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-slate-100 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">

@@ -204,6 +204,9 @@ export const ProduitClassique: React.FC = () => {
     setTimeout(() => champDesignation.current?.focus(), 30);
   };
 
+  // L'article tient-il ses quantites couleur par couleur ?
+  const suiviParCouleur = Boolean((enEdition as any)?.colorStockTracked);
+
   const enregistrer = async () => {
     try {
       const enCentimes = (v: string) => Math.round((parseFloat(v || '0') || 0) * 100);
@@ -222,12 +225,20 @@ export const ProduitClassique: React.FC = () => {
         location: emplacement.toUpperCase().trim(),
         unit: unite || 'PCS',
         minStock: parseInt(stockMin, 10) || 0,
-        colorMode: 'single',
-        colorIds: couleurId ? [Number(couleurId)] : [],
         barcodes: codesBarres,
-        compatibleModelIds: motosCompatibles,
-        initialStock: { '1': parseInt(stockInitial, 10) || 0 }
+        compatibleModelIds: motosCompatibles
       };
+
+      // Cet ecran ne gere qu'une couleur. Sur un article dont les quantites
+      // sont tenues couleur par couleur, il ne touche ni aux couleurs ni au
+      // stock : les omettre laisse le process principal les conserver tels
+      // quels, plutot que de les ecraser. La saisie se fait dans l'ecran
+      // moderne, section Couleurs.
+      if (!suiviParCouleur) {
+        charge.colorMode = 'single';
+        charge.colorIds = couleurId ? [Number(couleurId)] : [];
+        charge.initialStock = { '1': parseInt(stockInitial, 10) || 0 };
+      }
 
       if (enEdition) {
         await invokeIpc('update-product', { ...charge, id: enEdition.id });
@@ -467,8 +478,17 @@ export const ProduitClassique: React.FC = () => {
               </Ligne>
 
               <Ligne label="Qté stock">
-                <input className="gv-input !w-32 text-right" value={stockInitial} onChange={e => setStockInitial(e.target.value)} />
-                <span className="cl-hint">Total d'unités, toutes boutiques</span>
+                <input
+                  className="gv-input !w-32 text-right"
+                  value={stockInitial}
+                  readOnly={suiviParCouleur}
+                  onChange={e => setStockInitial(e.target.value)}
+                />
+                <span className="cl-hint">
+                  {suiviParCouleur
+                    ? "somme des quantités par couleur — se modifie dans l'écran moderne"
+                    : "Total d'unités, toutes boutiques"}
+                </span>
                 <span className="cl-label ms-4" style={{ minWidth: '7rem' }}>Stock minimum</span>
                 <input className="gv-input !w-24 text-right" value={stockMin} onChange={e => setStockMin(e.target.value)} />
                 <span className="cl-hint">seuil d'alerte</span>
